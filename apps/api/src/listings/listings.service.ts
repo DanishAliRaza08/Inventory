@@ -358,6 +358,23 @@ export class ListingsService {
     return { status: 'DRAFT' };
   }
 
+  /**
+   * Compliance sign-off is part of the review: it is recorded on the version under review
+   * without withdrawing the submission (unlike an edit).
+   */
+  async signOffCompliance(listingId: string, actor: AuthContext, note: string) {
+    const l = await this.loadForWorkflow(listingId);
+    if (!['AWAITING_APPROVAL', 'DRAFT', 'VALIDATION_FAILED', 'INCOMPLETE'].includes(l.status)) {
+      throw new ConflictException({ code: 'NOT_UNDER_REVIEW', message: `Cannot sign off a ${l.status} listing.` });
+    }
+    const content = ListingContent.parse({ ...(l.currentVersion!.content as object), complianceSignedOff: true });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.listingVersion.update({ where: { id: l.currentVersionId! }, data: { content, reviewNote: note } });
+      await this.audit.record(actor, { action: 'listing.compliance_signoff', entityType: 'listing', entityId: listingId, after: { versionId: l.currentVersionId, note } }, tx);
+    });
+    return this.runValidation(listingId);
+  }
+
   async archive(listingId: string, actor: AuthContext) {
     await this.applyEvent(listingId, 'ARCHIVE', actor, {}, 'Archived');
     return { status: 'ARCHIVED' };

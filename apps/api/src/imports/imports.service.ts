@@ -11,6 +11,13 @@ import { QUEUES, QueueService } from '../queue/queue.service';
 import { parseTable, writeTable } from './tabular';
 
 const CHUNK = 200;
+const IMPORT_CONCURRENCY = 6;
+
+interface ImportCache {
+  /** parent SKU (lower-case) -> product id, for grouping variations within a run. */
+  parents: Map<string, string>;
+  suppliers: Map<string, { id: string; defaultCurrency: string }>;
+}
 
 function supplierTypeFor(name: string) {
   const n = name.toLowerCase();
@@ -132,21 +139,50 @@ export class ImportsService implements OnModuleInit {
   /** Processes VALID (and previously FAILED) rows in chunks; IMPORTED rows are never re-applied. */
   async execute(jobId: string, actor: AuthContext) {
     const accounts = await this.prisma.marketplaceAccount.findMany({ orderBy: { createdAt: 'asc' } });
+    const cache: ImportCache = { parents: new Map(), suppliers: new Map() };
     for (;;) {
       const batch = await this.prisma.importRow.findMany({ where: { jobId, status: { in: ['VALID', 'FAILED'] }, importedAt: null }, orderBy: { rowNumber: 'asc' }, take: CHUNK });
       // Rows that FAILED in this run are marked with importedAt=epoch sentinel below to avoid infinite loops.
       if (!batch.length) break;
-      for (const row of batch) {
-        const data = row.data as unknown as ImportRow;
-        try {
-          const warnings = await this.importRow(jobId, row.rowNumber, data, actor, accounts);
-          await this.prisma.importRow.update({ where: { id: row.id }, data: { status: 'IMPORTED', importedAt: new Date(), errors: warnings.length ? warnings.map((w) => ({ field: 'warning', message: w })) : Prisma.JsonNull } });
-          await this.prisma.importJob.update({ where: { id: jobId }, data: { processedRows: { increment: 1 }, createdCount: { increment: row.action === 'CREATE' ? 1 : 0 }, updatedCount: { increment: row.action === 'UPDATE' ? 1 : 0 } } });
-        } catch (e) {
-          await this.prisma.importRow.update({ where: { id: row.id }, data: { status: 'FAILED', importedAt: new Date(0), errors: [{ field: 'row', message: (e as Error).message }] } });
-          await this.prisma.importJob.update({ where: { id: jobId }, data: { processedRows: { increment: 1 }, failedCount: { increment: 1 } } });
+      const progress = { processed: 0, created: 0, updated: 0, failed: 0 };
+      // Suppliers are created up-front so concurrent rows never race on the unique name.
+      for (const name of new Set(batch.map((r) => (r.data as unknown as ImportRow).supplier).filter((n): n is string => !!n))) {
+        if (!cache.suppliers.has(name)) {
+          const currency = batch.map((r) => r.data as unknown as ImportRow).find((d) => d.supplier === name)?.currency ?? 'USD';
+          cache.suppliers.set(name, await this.prisma.supplier.upsert({ where: { name }, update: {}, create: { name, type: supplierTypeFor(name), defaultCurrency: currency } }));
         }
       }
+      // Rows of the same parent product run in order; different products run concurrently.
+      const groups = new Map<string, typeof batch>();
+      for (const row of batch) {
+        const d = row.data as unknown as ImportRow;
+        const key = (d.parent_sku ?? d.product_id ?? d.sku).toLowerCase();
+        groups.set(key, [...(groups.get(key) ?? []), row]);
+      }
+      const runGroup = async (rows: typeof batch) => {
+        for (const row of rows) {
+          const data = row.data as unknown as ImportRow;
+          progress.processed++;
+          try {
+            const warnings = await this.importRow(jobId, row.rowNumber, data, actor, accounts, cache);
+            await this.prisma.importRow.update({ where: { id: row.id }, data: { status: 'IMPORTED', importedAt: new Date(), errors: warnings.length ? warnings.map((w) => ({ field: 'warning', message: w })) : Prisma.JsonNull } });
+            if (row.action === 'CREATE') progress.created++;
+            else progress.updated++;
+          } catch (e) {
+            progress.failed++;
+            await this.prisma.importRow.update({ where: { id: row.id }, data: { status: 'FAILED', importedAt: new Date(0), errors: [{ field: 'row', message: (e as Error).message }] } });
+          }
+        }
+      };
+      const queue = [...groups.values()];
+      await Promise.all(Array.from({ length: Math.min(IMPORT_CONCURRENCY, queue.length) }, async () => {
+        for (let g = queue.shift(); g; g = queue.shift()) await runGroup(g);
+      }));
+      // Progress is published once per chunk.
+      await this.prisma.importJob.update({
+        where: { id: jobId },
+        data: { processedRows: { increment: progress.processed }, createdCount: { increment: progress.created }, updatedCount: { increment: progress.updated }, failedCount: { increment: progress.failed } },
+      });
     }
     // Reset the sentinel so failed rows can be retried by committing again after fixes.
     await this.prisma.importRow.updateMany({ where: { jobId, status: 'FAILED' }, data: { importedAt: null } });
@@ -155,7 +191,13 @@ export class ImportsService implements OnModuleInit {
     await this.audit.record(actor, { action: 'import.complete', entityType: 'import', entityId: jobId, after: { created: job.createdCount, updated: job.updatedCount, failed } });
   }
 
-  private async resolveProductId(tx: Tx, d: ImportRow): Promise<string | null> {
+  /** Case-insensitive SKU lookup that uses the lower(sku) unique index. */
+  private async variantIdBySku(tx: Tx, sku: string): Promise<string | null> {
+    const r = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM product_variants WHERE lower(sku) = lower(${sku}) LIMIT 1`;
+    return r[0]?.id ?? null;
+  }
+
+  private async resolveProductId(tx: Tx, d: ImportRow, cache: ImportCache): Promise<string | null> {
     if (d.product_id) {
       const n = /^(FRP-)?0*(\d+)$/i.exec(d.product_id)?.[2];
       const p = await tx.product.findFirst({ where: n ? { productNumber: Number(n) } : { id: d.product_id } });
@@ -163,20 +205,34 @@ export class ImportsService implements OnModuleInit {
       return p.id;
     }
     if (d.parent_sku) {
-      const parent = await tx.productVariant.findFirst({ where: { sku: { equals: d.parent_sku, mode: 'insensitive' } } });
-      if (parent) return parent.productId;
+      const key = d.parent_sku.toLowerCase();
+      const cached = cache.parents.get(key);
+      if (cached) return cached;
+      const parentId = await this.variantIdBySku(tx, d.parent_sku);
+      if (parentId) {
+        const parent = await tx.productVariant.findUniqueOrThrow({ where: { id: parentId }, select: { productId: true } });
+        return parent.productId;
+      }
       const grouped = await tx.product.findFirst({ where: { attributes: { path: ['_parentSku'], equals: d.parent_sku } } });
       if (grouped) return grouped.id;
     }
     return null;
   }
 
-  private async importRow(jobId: string, rowNumber: number, d: ImportRow, actor: AuthContext, accounts: Array<{ id: string; marketplace: string }>): Promise<string[]> {
+  private async importRow(
+    jobId: string,
+    rowNumber: number,
+    d: ImportRow,
+    actor: AuthContext,
+    accounts: Array<{ id: string; marketplace: string }>,
+    cache: ImportCache,
+  ): Promise<string[]> {
     const warnings: string[] = [];
     const variantId = await this.prisma.$transaction(async (tx) => {
-      let variant = await tx.productVariant.findFirst({ where: { sku: { equals: d.sku, mode: 'insensitive' } }, include: { product: true } });
+      const existingId = await this.variantIdBySku(tx, d.sku);
+      let variant = existingId ? await tx.productVariant.findUnique({ where: { id: existingId }, include: { product: true } }) : null;
       if (!variant) {
-        let productId = await this.resolveProductId(tx, d);
+        let productId = await this.resolveProductId(tx, d, cache);
         if (!productId) {
           const p = await tx.product.create({
             data: {
@@ -192,6 +248,7 @@ export class ImportsService implements OnModuleInit {
           });
           productId = p.id;
         }
+        if (d.parent_sku) cache.parents.set(d.parent_sku.toLowerCase(), productId);
         const v = await tx.productVariant.create({
           data: { productId, sku: d.sku, title: d.parent_sku ? d.title : null, size: d.size, colour: d.colour, material: d.material, barcode: d.barcode, weightGrams: d.weight_g },
         });
@@ -212,7 +269,11 @@ export class ImportsService implements OnModuleInit {
 
       // Supplier & cost
       if (d.supplier) {
-        const supplier = await tx.supplier.upsert({ where: { name: d.supplier }, update: {}, create: { name: d.supplier, type: supplierTypeFor(d.supplier), defaultCurrency: d.currency ?? 'USD' } });
+        let supplier = cache.suppliers.get(d.supplier);
+        if (!supplier) {
+          supplier = await tx.supplier.upsert({ where: { name: d.supplier }, update: {}, create: { name: d.supplier, type: supplierTypeFor(d.supplier), defaultCurrency: d.currency ?? 'USD' } });
+          cache.suppliers.set(d.supplier, supplier);
+        }
         const existingSp = await tx.supplierProduct.findUnique({ where: { supplierId_variantId: { supplierId: supplier.id, variantId: variant.id } } });
         const price = d.cost !== undefined ? String(d.cost) : existingSp?.currentPrice.toString() ?? '0';
         const shipping = d.supplier_shipping !== undefined ? String(d.supplier_shipping) : existingSp?.shippingCost.toString() ?? '0';

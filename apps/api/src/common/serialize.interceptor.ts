@@ -6,7 +6,8 @@ import { Observable, map } from 'rxjs';
 /** Serialises Prisma/decimal.js Decimals as strings (never floats) and BigInts as strings. */
 export function serialize(value: unknown): unknown {
   if (value === null || value === undefined) return value;
-  if (value instanceof Prisma.Decimal || value instanceof Decimal) return value.toString();
+  // isDecimal also recognises Decimal instances from other copies of decimal.js (e.g. @fr/core).
+  if (Decimal.isDecimal(value) || Prisma.Decimal.isDecimal(value)) return (value as Decimal).toString();
   if (typeof value === 'bigint') return value.toString();
   if (value instanceof Date) return value.toISOString();
   if (Buffer.isBuffer(value)) return undefined;

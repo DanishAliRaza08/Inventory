@@ -159,6 +159,13 @@ export class ListingsController {
     return { approved: results.filter((r) => r.ok).length, results };
   }
 
+  @Post(':id/compliance-signoff')
+  @HttpCode(200)
+  @RequirePermissions('listings.approve')
+  signOff(@Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(RejectBody)) body: z.infer<typeof RejectBody>, @Auth() auth: AuthContext) {
+    return this.listings.signOffCompliance(id, auth, body.note);
+  }
+
   @Post(':id/reject')
   @HttpCode(200)
   @RequirePermissions('listings.approve')

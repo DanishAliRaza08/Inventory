@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --plane: #f9f9f7;
+  --surface-1: #fcfcfb;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #6f6d68;
+  --line: #e1e0d9;
+  --axis: #c3c2b7;
+  --brand: #2a78d6;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --good: #0ca30c;
+  --good-text: #006300;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --plane: #0d0d0d;
+    --surface-1: #1a1a19;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --line: #2c2c2a;
+    --axis: #383835;
+    --brand: #3987e5;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --good-text: #0ca30c;
+  }
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --plane: #0d0d0d;
+  --surface-1: #1a1a19;
+  --text-primary: #f0efec;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --line: #2c2c2a;
+  --axis: #383835;
+  --brand: #3987e5;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --good-text: #0ca30c;
+}
+
+body {
+  background: var(--plane);
+  color: var(--text-primary);
+}
+.card {
+  @apply rounded-lg border border-line bg-surface;
+}
+.btn {
+  @apply inline-flex items-center gap-1.5 rounded-md border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:bg-plane disabled:cursor-not-allowed disabled:opacity-50;
+}
+.btn-primary {
+  @apply inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50;
+}
+.btn-danger {
+  @apply inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50;
+  background: var(--critical);
+}
+.input {
+  @apply w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand;
+}
+.label {
+  @apply mb-1 block text-xs font-medium text-ink2;
+}
+.th {
+  @apply border-b border-line px-3 py-2 text-left text-xs font-medium text-ink2;
+}
+.td {
+  @apply border-b border-line px-3 py-2 text-sm;
+}
+.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}

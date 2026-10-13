@@ -116,9 +116,7 @@ export class ProductsService {
         if (initialCost) {
           await tx.costRecord.create({ data: { variantId: created.id, effectiveFrom: new Date(), source: 'manual', createdById: actor.userId, ...initialCost } });
         }
-        await tx.inventoryRecord.create({
-          data: { variantId: created.id, available: input.fulfilmentModel === 'PHYSICAL' ? initialStock ?? 0 : 0, policy: 'MANUAL' },
-        });
+        await this.createInventory(tx, created.id, input.fulfilmentModel === 'PHYSICAL' ? initialStock ?? 0 : 0, actor);
       }
       await this.audit.record(actor, { action: 'product.create', entityType: 'product', entityId: p.id, after: input }, tx);
       return p;
@@ -142,7 +140,7 @@ export class ProductsService {
       const { initialCost, initialStock, ...variant } = input;
       const v = await tx.productVariant.create({ data: { ...variant, attributes: variant.attributes ?? {}, productId } });
       if (initialCost) await tx.costRecord.create({ data: { variantId: v.id, effectiveFrom: new Date(), createdById: actor.userId, ...initialCost } });
-      await tx.inventoryRecord.create({ data: { variantId: v.id, available: p.fulfilmentModel === 'PHYSICAL' ? initialStock ?? 0 : 0 } });
+      await this.createInventory(tx, v.id, p.fulfilmentModel === 'PHYSICAL' ? initialStock ?? 0 : 0, actor);
       await this.audit.record(actor, { action: 'variant.create', entityType: 'variant', entityId: v.id, after: input }, tx);
       return v;
     });
@@ -230,6 +228,16 @@ export class ProductsService {
         : [],
     ]);
     return { products: products.map((p) => ({ ...p, code: productCode(p.productNumber) })), variants, listings, orders, suppliers };
+  }
+
+  /** Opening stock is recorded as a RECEIVE movement so every unit is traceable. */
+  private async createInventory(tx: Prisma.TransactionClient, variantId: string, openingStock: number, actor: AuthContext) {
+    const rec = await tx.inventoryRecord.create({ data: { variantId, available: openingStock, policy: 'MANUAL' } });
+    if (openingStock > 0) {
+      await tx.inventoryMovement.create({
+        data: { inventoryRecordId: rec.id, type: 'RECEIVE', fromBucket: 'EXTERNAL', toBucket: 'AVAILABLE', quantity: openingStock, reason: 'Opening stock', createdById: actor.userId },
+      });
+    }
   }
 
   private assertUniqueSkusInPayload(skus: string[]) {
