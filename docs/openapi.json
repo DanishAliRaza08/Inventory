@@ -1,0 +1,4843 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/health": {
+      "get": {
+        "operationId": "HealthController_health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "email",
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/mfa/setup": {
+      "post": {
+        "operationId": "AuthController_setupMfa",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/mfa/confirm": {
+      "post": {
+        "operationId": "AuthController_confirmMfa",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
+                  }
+                },
+                "required": [
+                  "code"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/mfa/verify": {
+      "post": {
+        "operationId": "AuthController_verifyMfa",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
+                  }
+                },
+                "required": [
+                  "code"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/password": {
+      "post": {
+        "operationId": "AuthController_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currentPassword": {
+                    "type": "string"
+                  },
+                  "newPassword": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "currentPassword",
+                  "newPassword"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/sessions": {
+      "get": {
+        "operationId": "AuthController_sessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/sessions/{id}": {
+      "delete": {
+        "operationId": "AuthController_revokeSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/users": {
+      "get": {
+        "operationId": "UsersController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Users & permissions"
+        ]
+      },
+      "post": {
+        "operationId": "UsersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "password": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "roleKeys": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "email",
+                  "name",
+                  "password",
+                  "roleKeys"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Users & permissions"
+        ]
+      }
+    },
+    "/api/users/{id}": {
+      "patch": {
+        "operationId": "UsersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "ACTIVE",
+                      "DISABLED"
+                    ]
+                  },
+                  "roleKeys": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Users & permissions"
+        ]
+      }
+    },
+    "/api/roles": {
+      "get": {
+        "operationId": "UsersController_roles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Users & permissions"
+        ]
+      }
+    },
+    "/api/permissions": {
+      "get": {
+        "operationId": "UsersController_permissions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Users & permissions"
+        ]
+      }
+    },
+    "/api/roles/{key}": {
+      "put": {
+        "operationId": "UsersController_upsertRole",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "permissions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "requiresMfa": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "name",
+                  "permissions"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Users & permissions"
+        ]
+      }
+    },
+    "/api/audit-logs": {
+      "get": {
+        "operationId": "AuditController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Audit"
+        ]
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "operationId": "SettingsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Settings"
+        ]
+      }
+    },
+    "/api/settings/{key}": {
+      "put": {
+        "operationId": "SettingsController_set",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Settings"
+        ]
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "operationId": "NotificationsController_list",
+        "parameters": [
+          {
+            "name": "unread",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/notifications/{id}/read": {
+      "post": {
+        "operationId": "NotificationsController_read",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/search": {
+      "get": {
+        "operationId": "ProductsController_search",
+        "parameters": [
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      }
+    },
+    "/api/products": {
+      "get": {
+        "operationId": "ProductsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "brand",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "fulfilmentModel",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "supplierId",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "marketplace",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "unlisted",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "stock",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      },
+      "post": {
+        "operationId": "ProductsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 20000,
+                    "default": ""
+                  },
+                  "category": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "brand": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "countryOfOrigin": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "DRAFT",
+                      "ACTIVE",
+                      "DISCONTINUED",
+                      "ARCHIVED"
+                    ],
+                    "default": "DRAFT"
+                  },
+                  "fulfilmentModel": {
+                    "type": "string",
+                    "enum": [
+                      "PHYSICAL",
+                      "DROPSHIP"
+                    ],
+                    "default": "DROPSHIP"
+                  },
+                  "attributes": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "default": {}
+                  },
+                  "restricted": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "variants": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "sku": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64,
+                          "pattern": "^[A-Za-z0-9._\\-\\/]+$"
+                        },
+                        "title": {
+                          "type": "string",
+                          "maxLength": 500
+                        },
+                        "size": {
+                          "type": "string",
+                          "maxLength": 60
+                        },
+                        "colour": {
+                          "type": "string",
+                          "maxLength": 60
+                        },
+                        "material": {
+                          "type": "string",
+                          "maxLength": 120
+                        },
+                        "barcode": {
+                          "type": "string",
+                          "maxLength": 14
+                        },
+                        "weightGrams": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "lengthMm": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "widthMm": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "heightMm": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "attributes": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "initialCost": {
+                          "type": "object",
+                          "properties": {
+                            "currency": {
+                              "allOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "string",
+                                  "pattern": "^[A-Z]{3}$"
+                                }
+                              ]
+                            },
+                            "supplierPrice": {
+                              "allOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "number"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "pattern": "^-?\\d+(\\.\\d{1,4})?$"
+                                }
+                              ]
+                            },
+                            "supplierShipping": {
+                              "$ref": "#/properties/variants/items/properties/initialCost/properties/supplierPrice"
+                            },
+                            "packaging": {
+                              "$ref": "#/properties/variants/items/properties/initialCost/properties/supplierPrice"
+                            }
+                          },
+                          "required": [
+                            "currency",
+                            "supplierPrice"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "initialStock": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "sku"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "title",
+                  "variants"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      }
+    },
+    "/api/products/duplicates": {
+      "get": {
+        "operationId": "ProductsController_duplicates",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      }
+    },
+    "/api/products/{id}": {
+      "get": {
+        "operationId": "ProductsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      },
+      "patch": {
+        "operationId": "ProductsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 20000,
+                    "default": ""
+                  },
+                  "category": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "brand": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "countryOfOrigin": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "DRAFT",
+                      "ACTIVE",
+                      "DISCONTINUED",
+                      "ARCHIVED"
+                    ],
+                    "default": "DRAFT"
+                  },
+                  "fulfilmentModel": {
+                    "type": "string",
+                    "enum": [
+                      "PHYSICAL",
+                      "DROPSHIP"
+                    ],
+                    "default": "DROPSHIP"
+                  },
+                  "attributes": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "default": {}
+                  },
+                  "restricted": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      }
+    },
+    "/api/products/{id}/archive": {
+      "post": {
+        "operationId": "ProductsController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      }
+    },
+    "/api/products/bulk-update": {
+      "post": {
+        "operationId": "ProductsController_bulkUpdate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "productIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "minItems": 1,
+                    "maxItems": 5000
+                  },
+                  "patch": {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "DRAFT",
+                          "ACTIVE",
+                          "DISCONTINUED",
+                          "ARCHIVED"
+                        ]
+                      },
+                      "category": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "brand": {
+                        "type": "string",
+                        "maxLength": 120
+                      },
+                      "fulfilmentModel": {
+                        "type": "string",
+                        "enum": [
+                          "PHYSICAL",
+                          "DROPSHIP"
+                        ]
+                      },
+                      "restricted": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "productIds",
+                  "patch"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      }
+    },
+    "/api/products/{id}/variants": {
+      "post": {
+        "operationId": "ProductsController_addVariant",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sku": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^[A-Za-z0-9._\\-\\/]+$"
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "size": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "colour": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "material": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "barcode": {
+                    "type": "string",
+                    "maxLength": 14
+                  },
+                  "weightGrams": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "lengthMm": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "widthMm": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "heightMm": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "attributes": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "initialCost": {
+                    "type": "object",
+                    "properties": {
+                      "currency": {
+                        "allOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^[A-Z]{3}$"
+                          }
+                        ]
+                      },
+                      "supplierPrice": {
+                        "allOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              }
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d{1,4})?$"
+                          }
+                        ]
+                      },
+                      "supplierShipping": {
+                        "$ref": "#/properties/initialCost/properties/supplierPrice"
+                      },
+                      "packaging": {
+                        "$ref": "#/properties/initialCost/properties/supplierPrice"
+                      }
+                    },
+                    "required": [
+                      "currency",
+                      "supplierPrice"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "initialStock": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "sku"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      }
+    },
+    "/api/variants/{id}": {
+      "patch": {
+        "operationId": "ProductsController_updateVariant",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sku": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64,
+                    "pattern": "^[A-Za-z0-9._\\-\\/]+$"
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "size": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "colour": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "material": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "barcode": {
+                    "type": "string",
+                    "maxLength": 14
+                  },
+                  "weightGrams": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "lengthMm": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "widthMm": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "heightMm": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "attributes": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "DRAFT",
+                      "ACTIVE",
+                      "DISCONTINUED",
+                      "ARCHIVED"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      }
+    },
+    "/api/variants/sku-aliases": {
+      "post": {
+        "operationId": "ProductsController_aliases",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "variantId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "MARKETPLACE",
+                            "SUPPLIER",
+                            "LEGACY"
+                          ]
+                        },
+                        "scope": {
+                          "type": "string",
+                          "maxLength": 64,
+                          "default": ""
+                        },
+                        "alias": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64,
+                          "pattern": "^[A-Za-z0-9._\\-\\/]+$"
+                        }
+                      },
+                      "required": [
+                        "variantId",
+                        "type",
+                        "alias"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1,
+                    "maxItems": 5000
+                  }
+                },
+                "required": [
+                  "items"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      }
+    },
+    "/api/products/{id}/images": {
+      "post": {
+        "operationId": "ImagesController_upload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      }
+    },
+    "/api/products/{id}/images/order": {
+      "put": {
+        "operationId": "ImagesController_reorder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      }
+    },
+    "/api/images/{imageId}": {
+      "delete": {
+        "operationId": "ImagesController_remove",
+        "parameters": [
+          {
+            "name": "imageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      }
+    },
+    "/api/files/images/{imageId}": {
+      "get": {
+        "operationId": "ImagesController_file",
+        "parameters": [
+          {
+            "name": "imageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      }
+    },
+    "/api/suppliers": {
+      "get": {
+        "operationId": "SuppliersController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Suppliers"
+        ]
+      },
+      "post": {
+        "operationId": "SuppliersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "ALIEXPRESS",
+                      "CJ_DROPSHIPPING",
+                      "MANUAL",
+                      "OTHER"
+                    ],
+                    "default": "MANUAL"
+                  },
+                  "website": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "contactName": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "defaultCurrency": {
+                    "allOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$"
+                      }
+                    ],
+                    "default": "USD"
+                  },
+                  "processingDays": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "deliveryDaysMin": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "deliveryDaysMax": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "reliabilityNotes": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 5000
+                  },
+                  "active": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Suppliers"
+        ]
+      }
+    },
+    "/api/suppliers/{id}": {
+      "get": {
+        "operationId": "SuppliersController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Suppliers"
+        ]
+      },
+      "patch": {
+        "operationId": "SuppliersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Suppliers"
+        ]
+      }
+    },
+    "/api/variants/{id}/suppliers": {
+      "post": {
+        "operationId": "SuppliersController_link",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "supplierId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "supplierSku": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "supplierProductId": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "currentPrice": {
+                    "allOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d{1,4})?$"
+                      }
+                    ]
+                  },
+                  "shippingCost": {
+                    "$ref": "#/properties/currentPrice",
+                    "default": "0"
+                  },
+                  "currency": {
+                    "allOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$"
+                      }
+                    ]
+                  },
+                  "processingDays": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "deliveryDaysMin": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "deliveryDaysMax": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "priority": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 1
+                  }
+                },
+                "required": [
+                  "supplierId",
+                  "currentPrice",
+                  "currency"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Suppliers"
+        ]
+      }
+    },
+    "/api/supplier-products/{id}/price": {
+      "post": {
+        "operationId": "SuppliersController_price",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currentPrice": {
+                    "allOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d{1,4})?$"
+                      }
+                    ]
+                  },
+                  "shippingCost": {
+                    "$ref": "#/properties/currentPrice"
+                  },
+                  "currency": {
+                    "allOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$"
+                      }
+                    ]
+                  },
+                  "source": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "default": "manual"
+                  },
+                  "applyToCost": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "currentPrice"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Suppliers"
+        ]
+      }
+    },
+    "/api/supplier-products/{id}/price-history": {
+      "get": {
+        "operationId": "SuppliersController_history",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Suppliers"
+        ]
+      }
+    },
+    "/api/supplier-products/{id}/stock": {
+      "post": {
+        "operationId": "SuppliersController_stock",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "stockStatus": {
+                    "type": "string",
+                    "enum": [
+                      "IN_STOCK",
+                      "LOW_STOCK",
+                      "OUT_OF_STOCK",
+                      "UNKNOWN",
+                      "DISCONTINUED"
+                    ]
+                  },
+                  "reportedQuantity": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "nullable": true
+                  },
+                  "source": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "manuallyVerified": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "stockStatus",
+                  "source"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Suppliers"
+        ]
+      }
+    },
+    "/api/variants/{id}/costs": {
+      "get": {
+        "operationId": "CostsController_history",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Costs"
+        ]
+      },
+      "post": {
+        "operationId": "CostsController_add",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "effectiveFrom": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "currency": {
+                    "allOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$"
+                      }
+                    ]
+                  },
+                  "supplierPrice": {
+                    "allOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d{1,4})?$"
+                      }
+                    ]
+                  },
+                  "supplierShipping": {
+                    "$ref": "#/properties/supplierPrice",
+                    "default": "0"
+                  },
+                  "packaging": {
+                    "$ref": "#/properties/supplierPrice",
+                    "default": "0"
+                  },
+                  "importDuty": {
+                    "$ref": "#/properties/supplierPrice",
+                    "default": "0"
+                  },
+                  "nonRecoverableTax": {
+                    "$ref": "#/properties/supplierPrice",
+                    "default": "0"
+                  },
+                  "fxConversionPercent": {
+                    "$ref": "#/properties/supplierPrice",
+                    "default": "0"
+                  },
+                  "purchasePaymentPercent": {
+                    "$ref": "#/properties/supplierPrice",
+                    "default": "0"
+                  },
+                  "otherPerUnit": {
+                    "$ref": "#/properties/supplierPrice",
+                    "default": "0"
+                  },
+                  "source": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "default": "manual"
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "verified": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "currency",
+                  "supplierPrice"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Costs"
+        ]
+      }
+    },
+    "/api/costs/{id}/verify": {
+      "post": {
+        "operationId": "CostsController_verify",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Costs"
+        ]
+      }
+    },
+    "/api/costs/unverified": {
+      "get": {
+        "operationId": "CostsController_unverified",
+        "parameters": [
+          {
+            "name": "days",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Costs"
+        ]
+      }
+    },
+    "/api/variants/{id}/inventory": {
+      "get": {
+        "operationId": "InventoryController_availability",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      }
+    },
+    "/api/variants/{id}/inventory/movements": {
+      "get": {
+        "operationId": "InventoryController_movements",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      },
+      "post": {
+        "operationId": "InventoryController_move",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "RECEIVE",
+                      "RESERVE",
+                      "RELEASE",
+                      "COMMIT",
+                      "SHIP",
+                      "RETURN",
+                      "RESTOCK",
+                      "DAMAGE",
+                      "RETURN_DAMAGED",
+                      "WRITE_OFF",
+                      "ADJUST_UP",
+                      "ADJUST_DOWN"
+                    ]
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "location": {
+                    "type": "string",
+                    "default": "MAIN"
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "type",
+                  "quantity"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      }
+    },
+    "/api/variants/{id}/inventory/count": {
+      "post": {
+        "operationId": "InventoryController_count",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "counted": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "counted",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      }
+    },
+    "/api/variants/{id}/inventory/settings": {
+      "patch": {
+        "operationId": "InventoryController_settings",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "safetyStock": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "policy": {
+                    "type": "string",
+                    "enum": [
+                      "MANUAL",
+                      "SUPPLIER_MONITOR",
+                      "AUTO_SYNC",
+                      "AUTO_PAUSE"
+                    ]
+                  },
+                  "allocationMode": {
+                    "type": "string",
+                    "enum": [
+                      "SHARED",
+                      "FIXED",
+                      "PERCENTAGE"
+                    ]
+                  },
+                  "requireRelistApproval": {
+                    "type": "boolean"
+                  },
+                  "dropshipSettings": {
+                    "type": "object",
+                    "properties": {
+                      "bufferPercent": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "bufferUnits": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "maxAdvertised": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "staleAfterHours": {
+                        "type": "number",
+                        "exclusiveMinimum": true,
+                        "minimum": 0
+                      },
+                      "defaultWhenUnreported": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "bufferPercent",
+                      "bufferUnits",
+                      "maxAdvertised",
+                      "staleAfterHours",
+                      "defaultWhenUnreported"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      }
+    },
+    "/api/fx-rates": {
+      "get": {
+        "operationId": "FinanceController_rates",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Profit & finance"
+        ]
+      },
+      "post": {
+        "operationId": "FinanceController_addRate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "base": {
+                    "allOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$"
+                      }
+                    ]
+                  },
+                  "quote": {
+                    "$ref": "#/properties/base"
+                  },
+                  "rate": {
+                    "allOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d{1,4})?$"
+                      }
+                    ]
+                  },
+                  "asOf": {
+                    "type": "string",
+                    "format": "date-time",
+                    "default": "2026-10-13T21:33:00.334Z"
+                  },
+                  "source": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "default": "manual"
+                  }
+                },
+                "required": [
+                  "base",
+                  "quote",
+                  "rate"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Profit & finance"
+        ]
+      }
+    },
+    "/api/fee-rules": {
+      "get": {
+        "operationId": "FinanceController_feeRules",
+        "parameters": [
+          {
+            "name": "marketplace",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Profit & finance"
+        ]
+      },
+      "post": {
+        "operationId": "FinanceController_addFeeRule",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "marketplace": {
+                    "type": "string",
+                    "enum": [
+                      "EBAY_UK",
+                      "EBAY_US",
+                      "AMAZON_UK",
+                      "TIKTOK_UK"
+                    ]
+                  },
+                  "feeType": {
+                    "type": "string",
+                    "enum": [
+                      "final_value",
+                      "per_order",
+                      "payment",
+                      "listing",
+                      "promoted",
+                      "advertising",
+                      "fulfilment",
+                      "regulatory",
+                      "other"
+                    ]
+                  },
+                  "basis": {
+                    "type": "string",
+                    "enum": [
+                      "item_price",
+                      "item_price_plus_shipping",
+                      "order_total_incl_tax",
+                      "order_total_excl_tax",
+                      "per_unit",
+                      "per_order"
+                    ]
+                  },
+                  "currency": {
+                    "allOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$"
+                      }
+                    ]
+                  },
+                  "percent": {
+                    "allOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d{1,4})?$"
+                      }
+                    ]
+                  },
+                  "tiers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "upTo": {
+                          "$ref": "#/properties/percent"
+                        },
+                        "percent": {
+                          "$ref": "#/properties/percent"
+                        }
+                      },
+                      "required": [
+                        "percent"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "fixed": {
+                    "$ref": "#/properties/percent"
+                  },
+                  "minFee": {
+                    "$ref": "#/properties/percent"
+                  },
+                  "maxFee": {
+                    "$ref": "#/properties/percent"
+                  },
+                  "categoryIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "default": []
+                  },
+                  "overrideGroup": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "effectiveFrom": {
+                    "type": "string",
+                    "format": "date-time",
+                    "default": "2026-10-13T21:33:00.336Z"
+                  },
+                  "effectiveTo": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  },
+                  "active": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "name",
+                  "marketplace",
+                  "feeType",
+                  "basis",
+                  "currency"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Profit & finance"
+        ]
+      }
+    },
+    "/api/fee-rules/{id}": {
+      "patch": {
+        "operationId": "FinanceController_updateFeeRule",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Profit & finance"
+        ]
+      }
+    },
+    "/api/profit/calculate": {
+      "post": {
+        "operationId": "FinanceController_calculate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "marketplace": {
+                    "type": "string",
+                    "enum": [
+                      "EBAY_UK",
+                      "EBAY_US",
+                      "AMAZON_UK",
+                      "TIKTOK_UK"
+                    ]
+                  },
+                  "variantId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "cost": {
+                    "type": "object",
+                    "properties": {
+                      "currency": {
+                        "allOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^[A-Z]{3}$"
+                          }
+                        ]
+                      },
+                      "supplierPrice": {
+                        "allOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              }
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d{1,4})?$"
+                          }
+                        ]
+                      },
+                      "supplierShipping": {
+                        "$ref": "#/properties/cost/properties/supplierPrice"
+                      },
+                      "packaging": {
+                        "$ref": "#/properties/cost/properties/supplierPrice"
+                      },
+                      "importDuty": {
+                        "$ref": "#/properties/cost/properties/supplierPrice"
+                      },
+                      "nonRecoverableTax": {
+                        "$ref": "#/properties/cost/properties/supplierPrice"
+                      },
+                      "fxConversionPercent": {
+                        "$ref": "#/properties/cost/properties/supplierPrice"
+                      },
+                      "purchasePaymentPercent": {
+                        "$ref": "#/properties/cost/properties/supplierPrice"
+                      },
+                      "otherPerUnit": {
+                        "$ref": "#/properties/cost/properties/supplierPrice"
+                      }
+                    },
+                    "required": [
+                      "currency",
+                      "supplierPrice"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "unitPrice": {
+                    "$ref": "#/properties/cost/properties/supplierPrice"
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0,
+                    "default": 1
+                  },
+                  "shippingCharged": {
+                    "$ref": "#/properties/cost/properties/supplierPrice",
+                    "default": "0"
+                  },
+                  "sellerDiscount": {
+                    "$ref": "#/properties/cost/properties/supplierPrice",
+                    "default": "0"
+                  },
+                  "categoryId": {
+                    "type": "string"
+                  },
+                  "fulfilmentCost": {
+                    "$ref": "#/properties/cost/properties/supplierPrice",
+                    "default": "0"
+                  },
+                  "advertisingCost": {
+                    "$ref": "#/properties/cost/properties/supplierPrice",
+                    "default": "0"
+                  },
+                  "otherExpenses": {
+                    "$ref": "#/properties/cost/properties/supplierPrice",
+                    "default": "0"
+                  },
+                  "taxTreatment": {
+                    "type": "string",
+                    "enum": [
+                      "seller_liable",
+                      "marketplace_collected",
+                      "not_registered"
+                    ]
+                  },
+                  "taxRatePercent": {
+                    "$ref": "#/properties/cost/properties/supplierPrice"
+                  },
+                  "pricesIncludeTax": {
+                    "type": "boolean"
+                  },
+                  "reportingCurrency": {
+                    "$ref": "#/properties/cost/properties/currency"
+                  }
+                },
+                "required": [
+                  "marketplace",
+                  "unitPrice"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Profit & finance"
+        ]
+      }
+    },
+    "/api/profit/reverse-price": {
+      "post": {
+        "operationId": "FinanceController_reverse",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "marketplace": {
+                    "type": "string",
+                    "enum": [
+                      "EBAY_UK",
+                      "EBAY_US",
+                      "AMAZON_UK",
+                      "TIKTOK_UK"
+                    ]
+                  },
+                  "variantId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "cost": {
+                    "type": "object",
+                    "properties": {
+                      "currency": {
+                        "allOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^[A-Z]{3}$"
+                          }
+                        ]
+                      },
+                      "supplierPrice": {
+                        "allOf": [
+                          {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              }
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^-?\\d+(\\.\\d{1,4})?$"
+                          }
+                        ]
+                      },
+                      "supplierShipping": {
+                        "$ref": "#/properties/cost/properties/supplierPrice"
+                      },
+                      "packaging": {
+                        "$ref": "#/properties/cost/properties/supplierPrice"
+                      },
+                      "importDuty": {
+                        "$ref": "#/properties/cost/properties/supplierPrice"
+                      },
+                      "nonRecoverableTax": {
+                        "$ref": "#/properties/cost/properties/supplierPrice"
+                      },
+                      "fxConversionPercent": {
+                        "$ref": "#/properties/cost/properties/supplierPrice"
+                      },
+                      "purchasePaymentPercent": {
+                        "$ref": "#/properties/cost/properties/supplierPrice"
+                      },
+                      "otherPerUnit": {
+                        "$ref": "#/properties/cost/properties/supplierPrice"
+                      }
+                    },
+                    "required": [
+                      "currency",
+                      "supplierPrice"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "minimum": 0,
+                    "default": 1
+                  },
+                  "shippingCharged": {
+                    "$ref": "#/properties/cost/properties/supplierPrice",
+                    "default": "0"
+                  },
+                  "sellerDiscount": {
+                    "$ref": "#/properties/cost/properties/supplierPrice",
+                    "default": "0"
+                  },
+                  "categoryId": {
+                    "type": "string"
+                  },
+                  "fulfilmentCost": {
+                    "$ref": "#/properties/cost/properties/supplierPrice",
+                    "default": "0"
+                  },
+                  "advertisingCost": {
+                    "$ref": "#/properties/cost/properties/supplierPrice",
+                    "default": "0"
+                  },
+                  "otherExpenses": {
+                    "$ref": "#/properties/cost/properties/supplierPrice",
+                    "default": "0"
+                  },
+                  "taxTreatment": {
+                    "type": "string",
+                    "enum": [
+                      "seller_liable",
+                      "marketplace_collected",
+                      "not_registered"
+                    ]
+                  },
+                  "taxRatePercent": {
+                    "$ref": "#/properties/cost/properties/supplierPrice"
+                  },
+                  "pricesIncludeTax": {
+                    "type": "boolean"
+                  },
+                  "reportingCurrency": {
+                    "$ref": "#/properties/cost/properties/currency"
+                  },
+                  "target": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "profit"
+                            ]
+                          },
+                          "amount": {
+                            "$ref": "#/properties/cost/properties/supplierPrice"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "amount"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "margin"
+                            ]
+                          },
+                          "percent": {
+                            "$ref": "#/properties/cost/properties/supplierPrice"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "percent"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "ending": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      ".99",
+                      ".49_or_.99"
+                    ],
+                    "default": "none"
+                  }
+                },
+                "required": [
+                  "marketplace",
+                  "target"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Profit & finance"
+        ]
+      }
+    },
+    "/api/profit/simple": {
+      "post": {
+        "operationId": "FinanceController_simple",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "netSalesRevenue": {
+                    "allOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d{1,4})?$"
+                      }
+                    ]
+                  },
+                  "productCost": {
+                    "$ref": "#/properties/netSalesRevenue"
+                  },
+                  "supplierShipping": {
+                    "$ref": "#/properties/productCost"
+                  },
+                  "marketplaceFees": {
+                    "$ref": "#/properties/productCost"
+                  },
+                  "paymentFees": {
+                    "$ref": "#/properties/productCost"
+                  },
+                  "fulfilmentCosts": {
+                    "$ref": "#/properties/productCost"
+                  },
+                  "advertisingCosts": {
+                    "$ref": "#/properties/productCost"
+                  },
+                  "otherExpenses": {
+                    "$ref": "#/properties/productCost"
+                  },
+                  "netRefundCosts": {
+                    "$ref": "#/properties/productCost"
+                  }
+                },
+                "required": [
+                  "netSalesRevenue",
+                  "productCost",
+                  "supplierShipping",
+                  "marketplaceFees"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Profit & finance"
+        ]
+      }
+    },
+    "/api/variants/{id}/profit": {
+      "get": {
+        "operationId": "FinanceController_variantProfit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Profit & finance"
+        ]
+      }
+    },
+    "/api/expenses": {
+      "get": {
+        "operationId": "FinanceController_expenses",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Profit & finance"
+        ]
+      },
+      "post": {
+        "operationId": "FinanceController_addExpense",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "SOFTWARE",
+                      "ADVERTISING",
+                      "ACCOUNTANCY",
+                      "STORAGE",
+                      "PACKAGING",
+                      "RETURNS_HANDLING",
+                      "BANK_CHARGES",
+                      "STAFF",
+                      "OTHER"
+                    ]
+                  },
+                  "description": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "amount": {
+                    "allOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d{1,4})?$"
+                      }
+                    ]
+                  },
+                  "currency": {
+                    "allOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[A-Z]{3}$"
+                      }
+                    ]
+                  },
+                  "supplierId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "marketplace": {
+                    "type": "string",
+                    "enum": [
+                      "EBAY_UK",
+                      "EBAY_US",
+                      "AMAZON_UK",
+                      "TIKTOK_UK"
+                    ]
+                  },
+                  "notes": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "allocation": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "by_revenue",
+                      "by_units"
+                    ],
+                    "default": "none"
+                  },
+                  "attributedToOrders": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "date",
+                  "category",
+                  "description",
+                  "amount",
+                  "currency"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Profit & finance"
+        ]
+      }
+    },
+    "/api/expenses/{id}": {
+      "delete": {
+        "operationId": "FinanceController_deleteExpense",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Profit & finance"
+        ]
+      }
+    },
+    "/api/listings": {
+      "get": {
+        "operationId": "ListingsController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "marketplace",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "accountId",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "assignedToId",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      },
+      "post": {
+        "operationId": "ListingsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "variantId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "accountId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "sku": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "price": {
+                    "allOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d{1,4})?$"
+                      }
+                    ]
+                  },
+                  "templateId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "content": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "default": ""
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 50000,
+                        "default": ""
+                      },
+                      "bulletPoints": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 1000
+                        },
+                        "maxItems": 10,
+                        "default": []
+                      },
+                      "categoryId": {
+                        "type": "string",
+                        "maxLength": 64,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "categoryName": {
+                        "type": "string",
+                        "maxLength": 300,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "condition": {
+                        "type": "string",
+                        "maxLength": 40,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "attributes": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          ]
+                        },
+                        "default": {}
+                      },
+                      "requiredAttributes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "default": []
+                      },
+                      "verifiedAttributes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "default": []
+                      },
+                      "imageIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "default": []
+                      },
+                      "shippingPolicyId": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "returnPolicyId": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "dispatchTimeDays": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 30,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "quantityPolicy": {
+                        "type": "string",
+                        "enum": [
+                          "SYNC",
+                          "FIXED",
+                          "MANUAL"
+                        ],
+                        "nullable": true,
+                        "default": "SYNC"
+                      },
+                      "fixedQuantity": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "brand": {
+                        "type": "string",
+                        "maxLength": 120,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "gtin": {
+                        "type": "string",
+                        "maxLength": 14,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "identifierExemption": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "searchKeywords": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "maxItems": 50,
+                        "default": []
+                      },
+                      "handlingInstructions": {
+                        "type": "string",
+                        "maxLength": 2000,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "notes": {
+                        "type": "string",
+                        "maxLength": 5000,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "complianceSignedOff": {
+                        "type": "boolean",
+                        "default": false
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "variantId",
+                  "accountId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/templates": {
+      "get": {
+        "operationId": "ListingsController_templates",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      },
+      "post": {
+        "operationId": "ListingsController_createTemplate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "marketplace": {
+                    "type": "string",
+                    "enum": [
+                      "EBAY_UK",
+                      "EBAY_US",
+                      "AMAZON_UK",
+                      "TIKTOK_UK"
+                    ]
+                  },
+                  "titleTemplate": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "descriptionTemplate": {
+                    "type": "string",
+                    "maxLength": 20000
+                  },
+                  "bulletTemplates": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 1000
+                    },
+                    "maxItems": 10,
+                    "default": []
+                  },
+                  "defaults": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "default": ""
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 50000,
+                        "default": ""
+                      },
+                      "bulletPoints": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 1000
+                        },
+                        "maxItems": 10,
+                        "default": []
+                      },
+                      "categoryId": {
+                        "type": "string",
+                        "maxLength": 64,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "categoryName": {
+                        "type": "string",
+                        "maxLength": 300,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "condition": {
+                        "type": "string",
+                        "maxLength": 40,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "attributes": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          ]
+                        },
+                        "default": {}
+                      },
+                      "requiredAttributes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "default": []
+                      },
+                      "verifiedAttributes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "default": []
+                      },
+                      "imageIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "default": []
+                      },
+                      "shippingPolicyId": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "returnPolicyId": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "dispatchTimeDays": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 30,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "quantityPolicy": {
+                        "type": "string",
+                        "enum": [
+                          "SYNC",
+                          "FIXED",
+                          "MANUAL"
+                        ],
+                        "nullable": true,
+                        "default": "SYNC"
+                      },
+                      "fixedQuantity": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "brand": {
+                        "type": "string",
+                        "maxLength": 120,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "gtin": {
+                        "type": "string",
+                        "maxLength": 14,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "identifierExemption": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "searchKeywords": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "maxItems": 50,
+                        "default": []
+                      },
+                      "handlingInstructions": {
+                        "type": "string",
+                        "maxLength": 2000,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "notes": {
+                        "type": "string",
+                        "maxLength": 5000,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "complianceSignedOff": {
+                        "type": "boolean",
+                        "default": false
+                      }
+                    },
+                    "additionalProperties": false,
+                    "default": {}
+                  },
+                  "isDefault": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "name",
+                  "marketplace",
+                  "titleTemplate",
+                  "descriptionTemplate"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/{id}": {
+      "get": {
+        "operationId": "ListingsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      },
+      "patch": {
+        "operationId": "ListingsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "default": ""
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 50000,
+                        "default": ""
+                      },
+                      "bulletPoints": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 1000
+                        },
+                        "maxItems": 10,
+                        "default": []
+                      },
+                      "categoryId": {
+                        "type": "string",
+                        "maxLength": 64,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "categoryName": {
+                        "type": "string",
+                        "maxLength": 300,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "condition": {
+                        "type": "string",
+                        "maxLength": 40,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "attributes": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          ]
+                        },
+                        "default": {}
+                      },
+                      "requiredAttributes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "default": []
+                      },
+                      "verifiedAttributes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "default": []
+                      },
+                      "imageIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "default": []
+                      },
+                      "shippingPolicyId": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "returnPolicyId": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "dispatchTimeDays": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 30,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "quantityPolicy": {
+                        "type": "string",
+                        "enum": [
+                          "SYNC",
+                          "FIXED",
+                          "MANUAL"
+                        ],
+                        "nullable": true,
+                        "default": "SYNC"
+                      },
+                      "fixedQuantity": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "brand": {
+                        "type": "string",
+                        "maxLength": 120,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "gtin": {
+                        "type": "string",
+                        "maxLength": 14,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "identifierExemption": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "searchKeywords": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "maxItems": 50,
+                        "default": []
+                      },
+                      "handlingInstructions": {
+                        "type": "string",
+                        "maxLength": 2000,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "notes": {
+                        "type": "string",
+                        "maxLength": 5000,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "complianceSignedOff": {
+                        "type": "boolean",
+                        "default": false
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "price": {
+                    "allOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d{1,4})?$"
+                      }
+                    ],
+                    "nullable": true
+                  },
+                  "sku": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "assignedToId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/bulk-drafts": {
+      "post": {
+        "operationId": "ListingsController_bulkDrafts",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "variantIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "minItems": 1,
+                    "maxItems": 500
+                  },
+                  "accountId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "templateId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "pricing": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "none"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "kind"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "fixed"
+                            ]
+                          },
+                          "price": {
+                            "allOf": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "pattern": "^-?\\d+(\\.\\d{1,4})?$"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "price"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "margin"
+                            ]
+                          },
+                          "percent": {
+                            "$ref": "#/properties/pricing/anyOf/1/properties/price"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "percent"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "profit"
+                            ]
+                          },
+                          "amount": {
+                            "$ref": "#/properties/pricing/anyOf/1/properties/price"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "amount"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "variantIds",
+                  "accountId",
+                  "pricing"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/{id}/sync-from-master": {
+      "post": {
+        "operationId": "ListingsController_sync",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/{id}/validate": {
+      "post": {
+        "operationId": "ListingsController_validate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/{id}/submit": {
+      "post": {
+        "operationId": "ListingsController_submit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/{id}/approve": {
+      "post": {
+        "operationId": "ListingsController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/bulk-approve": {
+      "post": {
+        "operationId": "ListingsController_bulkApprove",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/{id}/compliance-signoff": {
+      "post": {
+        "operationId": "ListingsController_signOff",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/{id}/reject": {
+      "post": {
+        "operationId": "ListingsController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/{id}/publish": {
+      "post": {
+        "operationId": "ListingsController_publish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/{id}/retry": {
+      "post": {
+        "operationId": "ListingsController_retry",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/bulk-publish/preview": {
+      "post": {
+        "operationId": "ListingsController_preview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/bulk-publish": {
+      "post": {
+        "operationId": "ListingsController_bulkPublish",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/{id}/revise": {
+      "post": {
+        "operationId": "ListingsController_revise",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/{id}/pause": {
+      "post": {
+        "operationId": "ListingsController_pause",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/{id}/end": {
+      "post": {
+        "operationId": "ListingsController_end",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/{id}/resume": {
+      "post": {
+        "operationId": "ListingsController_resume",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/{id}/archive": {
+      "post": {
+        "operationId": "ListingsController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/jobs/sweep": {
+      "post": {
+        "operationId": "ListingsController_sweep",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/integrations/accounts": {
+      "get": {
+        "operationId": "AccountsController_accounts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      },
+      "post": {
+        "operationId": "AccountsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "marketplace": {
+                    "type": "string",
+                    "enum": [
+                      "EBAY_UK",
+                      "EBAY_US",
+                      "AMAZON_UK",
+                      "TIKTOK_UK"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "environment": {
+                    "type": "string",
+                    "enum": [
+                      "SANDBOX",
+                      "PRODUCTION",
+                      "DEMO"
+                    ],
+                    "default": "SANDBOX"
+                  }
+                },
+                "required": [
+                  "marketplace",
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/api/integrations/capabilities": {
+      "get": {
+        "operationId": "AccountsController_capabilities",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/api/imports/template": {
+      "get": {
+        "operationId": "ImportsController_template",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Imports & exports"
+        ]
+      }
+    },
+    "/api/imports": {
+      "get": {
+        "operationId": "ImportsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Imports & exports"
+        ]
+      },
+      "post": {
+        "operationId": "ImportsController_upload",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Imports & exports"
+        ]
+      }
+    },
+    "/api/imports/{id}": {
+      "get": {
+        "operationId": "ImportsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Imports & exports"
+        ]
+      }
+    },
+    "/api/imports/{id}/validate": {
+      "post": {
+        "operationId": "ImportsController_validate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Imports & exports"
+        ]
+      }
+    },
+    "/api/imports/{id}/commit": {
+      "post": {
+        "operationId": "ImportsController_commit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Imports & exports"
+        ]
+      }
+    },
+    "/api/imports/{id}/errors": {
+      "get": {
+        "operationId": "ImportsController_errors",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Imports & exports"
+        ]
+      }
+    },
+    "/api/exports/products": {
+      "get": {
+        "operationId": "ImportsController_exportProducts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Imports & exports"
+        ]
+      }
+    },
+    "/api/exports/listings": {
+      "get": {
+        "operationId": "ImportsController_exportListings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Imports & exports"
+        ]
+      }
+    },
+    "/api/exports/costs": {
+      "get": {
+        "operationId": "ImportsController_exportCosts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Imports & exports"
+        ]
+      }
+    },
+    "/api/dashboard/summary": {
+      "get": {
+        "operationId": "DashboardController_summary",
+        "parameters": [
+          {
+            "name": "_",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "preset",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "marketplace",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "variantId",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "supplierId",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "bucket",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/api/dashboard/timeseries": {
+      "get": {
+        "operationId": "DashboardController_timeseries",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Fashion Rockstar Operations API",
+    "description": "Multi-channel inventory, profit and listing management. All state-changing requests require the X-Requested-With header and a session cookie (fr_session).",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "cookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "fr_session"
+      }
+    },
+    "schemas": {}
+  }
+}

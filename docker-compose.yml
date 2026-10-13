@@ -1,0 +1,45 @@
+# Local full stack. For production use managed PostgreSQL/Redis/S3 and a secrets manager.
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: fr
+      POSTGRES_PASSWORD: fr
+      POSTGRES_DB: fashion_rockstar
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fr"]
+      interval: 5s
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+  migrate:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    command: ["npx", "prisma", "migrate", "deploy", "--schema", "prisma/schema.prisma"]
+    environment: &api-env
+      DATABASE_URL: postgresql://fr:fr@postgres:5432/fashion_rockstar?schema=public
+      REDIS_URL: redis://redis:6379
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:?set APP_ENCRYPTION_KEY}
+      WEB_ORIGIN: http://localhost:3000
+      NODE_ENV: ${NODE_ENV:-development}
+      DEMO_MODE: ${DEMO_MODE:-false}
+      QUEUE_MODE: bullmq
+    depends_on: { postgres: { condition: service_healthy } }
+  api:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    environment: *api-env
+    ports: ["4000:4000"]
+    depends_on: { migrate: { condition: service_completed_successfully }, redis: { condition: service_started } }
+  worker:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    command: ["node", "dist/src/worker.js"]
+    environment: *api-env
+    depends_on: { migrate: { condition: service_completed_successfully }, redis: { condition: service_started } }
+  web:
+    build: { context: ., dockerfile: apps/web/Dockerfile, args: { API_URL: "http://api:4000" } }
+    environment: { API_URL: "http://api:4000" }
+    ports: ["3000:3000"]
+    depends_on: [api]
+volumes:
+  pgdata:

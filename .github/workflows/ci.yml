@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: fr, POSTGRES_PASSWORD: fr, POSTGRES_DB: fashion_rockstar_test }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U fr" --health-interval 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://fr:fr@localhost:5432/fashion_rockstar_test?schema=public
+      DATABASE_URL: postgresql://fr:fr@localhost:5432/fashion_rockstar_test?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @fr/core build
+      - run: pnpm --filter @fr/api prisma:generate
+      - run: pnpm typecheck
+      - name: Core unit tests (profit, fees, FX, pricing, lifecycle, validation, inventory, imports)
+        run: pnpm --filter @fr/core test
+      - name: API integration tests (real PostgreSQL)
+        run: pnpm --filter @fr/api test
+      - run: pnpm --filter @fr/web build
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: test
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: fr, POSTGRES_PASSWORD: fr, POSTGRES_DB: fashion_rockstar }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U fr" --health-interval 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://fr:fr@localhost:5432/fashion_rockstar?schema=public
+      APP_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      DEMO_MODE: "true"
+      QUEUE_MODE: inline
+      SEED_OWNER_EMAIL: owner@fashionrockstar.example
+      SEED_OWNER_PASSWORD: ChangeMe-Owner-2026
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @fr/core build && pnpm --filter @fr/api prisma:generate && pnpm --filter @fr/api build
+      - run: pnpm --filter @fr/api prisma:migrate && pnpm --filter @fr/api seed
+      - run: pnpm --filter @fr/web build
+      - run: |
+          (cd apps/api && node dist/src/main.js &) 
+          (cd apps/web && pnpm start &)
+          npx wait-on -t 60000 http://localhost:4000/api/health http://localhost:3000/login
+      - run: pnpm --filter @fr/e2e exec playwright install --with-deps chromium
+      - run: pnpm --filter @fr/e2e test:e2e
