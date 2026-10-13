@@ -1,0 +1,1090 @@
+// Fashion Rockstar LTD platform schema.
+// Conventions: UUID primary keys, snake_case tables, money as DECIMAL(14,4) + ISO currency,
+// every financially relevant record is append-only or effective-dated.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────── Identity & access ─────────────────────────────
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+model User {
+  id             String     @id @default(uuid()) @db.Uuid
+  email          String     @unique
+  name           String
+  passwordHash   String     @map("password_hash")
+  status         UserStatus @default(ACTIVE)
+  mfaEnabled     Boolean    @default(false) @map("mfa_enabled")
+  mfaSecretEnc   String?    @map("mfa_secret_enc")
+  failedLogins   Int        @default(0) @map("failed_logins")
+  lockedUntil    DateTime?  @map("locked_until")
+  lastLoginAt    DateTime?  @map("last_login_at")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  roles          UserRole[]
+  sessions       Session[]
+  notifications  Notification[]
+  savedViews     SavedView[]
+
+  @@map("users")
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  key         String           @unique
+  name        String
+  description String           @default("")
+  isSystem    Boolean          @default(false) @map("is_system")
+  requiresMfa Boolean          @default(false) @map("requires_mfa")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  key         String           @id
+  description String
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId        String     @map("role_id") @db.Uuid
+  permissionKey String     @map("permission_key")
+  role          Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission    Permission @relation(fields: [permissionKey], references: [key], onDelete: Cascade)
+
+  @@id([roleId, permissionKey])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model Session {
+  id          String    @id @default(uuid()) @db.Uuid
+  tokenHash   String    @unique @map("token_hash")
+  userId      String    @map("user_id") @db.Uuid
+  mfaVerified Boolean   @default(false) @map("mfa_verified")
+  ip          String?
+  userAgent   String?   @map("user_agent")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  lastSeenAt  DateTime  @default(now()) @map("last_seen_at")
+  expiresAt   DateTime  @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ───────────────────────────── Catalogue ─────────────────────────────
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  DISCONTINUED
+  ARCHIVED
+}
+
+enum FulfilmentModel {
+  PHYSICAL
+  DROPSHIP
+}
+
+model Product {
+  id              String          @id @default(uuid()) @db.Uuid
+  /// Permanent, human-readable internal product number (displayed as FRP-000123). Never reused.
+  productNumber   Int             @unique @default(autoincrement()) @map("product_number")
+  title           String
+  description     String          @default("")
+  category        String?
+  brand           String?
+  countryOfOrigin String?         @map("country_of_origin")
+  status          ProductStatus   @default(DRAFT)
+  fulfilmentModel FulfilmentModel @default(DROPSHIP) @map("fulfilment_model")
+  attributes      Json            @default("{}")
+  /// Restricted / regulated items require compliance sign-off before listing approval.
+  restricted      Boolean         @default(false)
+  createdById     String?         @map("created_by_id") @db.Uuid
+  updatedById     String?         @map("updated_by_id") @db.Uuid
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  variants        ProductVariant[]
+  images          ProductImage[]
+  listings        MarketplaceListing[]
+
+  @@index([status])
+  @@index([category])
+  @@index([title(ops: raw("gin_trgm_ops"))], map: "products_title_trgm", type: Gin)
+  @@map("products")
+}
+
+model ProductVariant {
+  id              String    @id @default(uuid()) @db.Uuid
+  productId       String    @map("product_id") @db.Uuid
+  /// Master SKU — unique across the whole catalogue (case-insensitive unique index in migration).
+  sku             String    @unique
+  title           String?
+  size            String?
+  colour          String?
+  material        String?
+  barcode         String?
+  weightGrams     Int?      @map("weight_grams")
+  lengthMm        Int?      @map("length_mm")
+  widthMm         Int?      @map("width_mm")
+  heightMm        Int?      @map("height_mm")
+  attributes      Json      @default("{}")
+  status          ProductStatus @default(ACTIVE)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  product          Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  aliases          SkuAlias[]
+  supplierProducts SupplierProduct[]
+  costRecords      CostRecord[]
+  inventory        InventoryRecord[]
+  listings         MarketplaceListing[]
+  images           ProductImage[]
+  orderLines       OrderLine[]
+
+  @@index([productId])
+  @@index([barcode])
+  @@index([sku(ops: raw("gin_trgm_ops"))], map: "product_variants_sku_trgm", type: Gin)
+  @@map("product_variants")
+}
+
+enum SkuAliasType {
+  MARKETPLACE
+  SUPPLIER
+  LEGACY
+}
+
+/// Alternative SKUs used to match orders and supplier feeds back to a master SKU.
+model SkuAlias {
+  id          String         @id @default(uuid()) @db.Uuid
+  variantId   String         @map("variant_id") @db.Uuid
+  type        SkuAliasType
+  scope       String         @default("") // e.g. marketplace code or supplier id
+  alias       String
+  createdAt   DateTime       @default(now()) @map("created_at")
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([type, scope, alias])
+  @@map("sku_aliases")
+}
+
+model ProductImage {
+  id         String          @id @default(uuid()) @db.Uuid
+  productId  String          @map("product_id") @db.Uuid
+  variantId  String?         @map("variant_id") @db.Uuid
+  storageKey String          @map("storage_key")
+  url        String
+  position   Int             @default(0)
+  isMain     Boolean         @default(false) @map("is_main")
+  width      Int?
+  height     Int?
+  format     String?
+  sizeBytes  Int?            @map("size_bytes")
+  sha256     String?
+  altText    String?         @map("alt_text")
+  /// Provenance: UPLOAD, SUPPLIER, AI_GENERATED. AI images need human approval before use.
+  source     String          @default("UPLOAD")
+  approved   Boolean         @default(true)
+  createdAt  DateTime        @default(now()) @map("created_at")
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant    ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([productId, position])
+  @@index([sha256])
+  @@map("product_images")
+}
+
+// ───────────────────────────── Suppliers & costs ─────────────────────────────
+
+enum SupplierType {
+  ALIEXPRESS
+  CJ_DROPSHIPPING
+  MANUAL
+  OTHER
+}
+
+model Supplier {
+  id                String       @id @default(uuid()) @db.Uuid
+  name              String       @unique
+  type              SupplierType @default(MANUAL)
+  website           String?
+  contactName       String?      @map("contact_name")
+  email             String?
+  phone             String?
+  defaultCurrency   String       @default("USD") @map("default_currency") @db.Char(3)
+  processingDays    Int?         @map("processing_days")
+  deliveryDaysMin   Int?         @map("delivery_days_min")
+  deliveryDaysMax   Int?         @map("delivery_days_max")
+  reliabilityNotes  String?      @map("reliability_notes")
+  notes             String?
+  active            Boolean      @default(true)
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+  products          SupplierProduct[]
+  expenses          Expense[]
+
+  @@map("suppliers")
+}
+
+enum SupplierStockStatus {
+  IN_STOCK
+  LOW_STOCK
+  OUT_OF_STOCK
+  UNKNOWN
+  DISCONTINUED
+}
+
+model SupplierProduct {
+  id                 String              @id @default(uuid()) @db.Uuid
+  supplierId         String              @map("supplier_id") @db.Uuid
+  variantId          String              @map("variant_id") @db.Uuid
+  supplierSku        String?             @map("supplier_sku")
+  supplierProductId  String?             @map("supplier_product_id")
+  url                String?
+  currentPrice       Decimal             @map("current_price") @db.Decimal(14, 4)
+  shippingCost       Decimal             @default(0) @map("shipping_cost") @db.Decimal(14, 4)
+  currency           String              @db.Char(3)
+  processingDays     Int?                @map("processing_days")
+  deliveryDaysMin    Int?                @map("delivery_days_min")
+  deliveryDaysMax    Int?                @map("delivery_days_max")
+  stockStatus        SupplierStockStatus @default(UNKNOWN) @map("stock_status")
+  reportedQuantity   Int?                @map("reported_quantity")
+  stockCheckedAt     DateTime?           @map("stock_checked_at")
+  stockSource        String?             @map("stock_source")
+  manuallyVerifiedAt DateTime?           @map("manually_verified_at")
+  manuallyVerifiedBy String?             @map("manually_verified_by") @db.Uuid
+  /// 1 = primary supplier, 2+ = backups in order of preference.
+  priority           Int                 @default(1)
+  lastPriceUpdateAt  DateTime            @default(now()) @map("last_price_update_at")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  supplier           Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  variant            ProductVariant      @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  priceHistory       SupplierPriceHistory[]
+
+  @@unique([supplierId, variantId])
+  @@index([variantId, priority])
+  @@index([stockStatus])
+  @@map("supplier_products")
+}
+
+model SupplierPriceHistory {
+  id                String          @id @default(uuid()) @db.Uuid
+  supplierProductId String          @map("supplier_product_id") @db.Uuid
+  price             Decimal         @db.Decimal(14, 4)
+  shippingCost      Decimal         @map("shipping_cost") @db.Decimal(14, 4)
+  currency          String          @db.Char(3)
+  observedAt        DateTime        @default(now()) @map("observed_at")
+  source            String
+  recordedById      String?         @map("recorded_by_id") @db.Uuid
+  supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+
+  @@index([supplierProductId, observedAt])
+  @@map("supplier_price_history")
+}
+
+/// Effective-dated per-unit cost. Never updated in place once used: a change closes the
+/// open record (effective_to) and inserts a new one. At most one open record per variant.
+model CostRecord {
+  id                     String         @id @default(uuid()) @db.Uuid
+  variantId              String         @map("variant_id") @db.Uuid
+  effectiveFrom          DateTime       @map("effective_from")
+  effectiveTo            DateTime?      @map("effective_to")
+  currency               String         @db.Char(3)
+  supplierPrice          Decimal        @map("supplier_price") @db.Decimal(14, 4)
+  supplierShipping       Decimal        @default(0) @map("supplier_shipping") @db.Decimal(14, 4)
+  packaging              Decimal        @default(0) @db.Decimal(14, 4)
+  importDuty             Decimal        @default(0) @map("import_duty") @db.Decimal(14, 4)
+  nonRecoverableTax      Decimal        @default(0) @map("non_recoverable_tax") @db.Decimal(14, 4)
+  fxConversionPercent    Decimal        @default(0) @map("fx_conversion_percent") @db.Decimal(7, 4)
+  purchasePaymentPercent Decimal        @default(0) @map("purchase_payment_percent") @db.Decimal(7, 4)
+  otherPerUnit           Decimal        @default(0) @map("other_per_unit") @db.Decimal(14, 4)
+  source                 String         @default("manual")
+  notes                  String?
+  verifiedAt             DateTime?      @map("verified_at")
+  verifiedById           String?        @map("verified_by_id") @db.Uuid
+  createdById            String?        @map("created_by_id") @db.Uuid
+  createdAt              DateTime       @default(now()) @map("created_at")
+  variant                ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  orderLines             OrderLine[]
+
+  @@index([variantId, effectiveFrom])
+  @@map("cost_records")
+}
+
+// ───────────────────────────── Inventory ─────────────────────────────
+
+enum InventoryPolicy {
+  MANUAL
+  SUPPLIER_MONITOR
+  AUTO_SYNC
+  AUTO_PAUSE
+}
+
+enum AllocationMode {
+  SHARED
+  FIXED
+  PERCENTAGE
+}
+
+model InventoryRecord {
+  id                    String          @id @default(uuid()) @db.Uuid
+  variantId             String          @map("variant_id") @db.Uuid
+  location              String          @default("MAIN")
+  available             Int             @default(0)
+  reserved              Int             @default(0)
+  committed             Int             @default(0)
+  damaged               Int             @default(0)
+  returned              Int             @default(0)
+  safetyStock           Int             @default(0) @map("safety_stock")
+  policy                InventoryPolicy @default(MANUAL)
+  allocationMode        AllocationMode  @default(SHARED) @map("allocation_mode")
+  requireRelistApproval Boolean         @default(true) @map("require_relist_approval")
+  dropshipSettings      Json?           @map("dropship_settings")
+  lastCheckedAt         DateTime?       @map("last_checked_at")
+  source                String?
+  notes                 String?
+  /// Optimistic concurrency token, incremented on every change.
+  version               Int             @default(0)
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+  variant               ProductVariant  @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  movements             InventoryMovement[]
+
+  @@unique([variantId, location])
+  @@map("inventory_records")
+}
+
+enum StockBucket {
+  AVAILABLE
+  RESERVED
+  COMMITTED
+  DAMAGED
+  RETURNED
+  EXTERNAL
+}
+
+model InventoryMovement {
+  id                String          @id @default(uuid()) @db.Uuid
+  inventoryRecordId String          @map("inventory_record_id") @db.Uuid
+  type              String // RECEIVE, ADJUST, RESERVE, RELEASE, COMMIT, SHIP, RETURN, DAMAGE, COUNT
+  fromBucket        StockBucket     @map("from_bucket")
+  toBucket          StockBucket     @map("to_bucket")
+  quantity          Int
+  reason            String?
+  /// Prevents repeated adjustments from retried jobs / webhooks.
+  idempotencyKey    String?         @unique @map("idempotency_key")
+  orderLineId       String?         @map("order_line_id") @db.Uuid
+  createdById       String?         @map("created_by_id") @db.Uuid
+  createdAt         DateTime        @default(now()) @map("created_at")
+  inventoryRecord   InventoryRecord @relation(fields: [inventoryRecordId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryRecordId, createdAt])
+  @@map("inventory_movements")
+}
+
+// ───────────────────────────── Marketplaces & listings ─────────────────────────────
+
+enum Marketplace {
+  EBAY_UK
+  EBAY_US
+  AMAZON_UK
+  TIKTOK_UK
+}
+
+enum AccountStatus {
+  NOT_CONNECTED
+  CONNECTED
+  EXPIRED
+  ERROR
+  DISABLED
+}
+
+enum ApiEnvironment {
+  SANDBOX
+  PRODUCTION
+  DEMO
+}
+
+model MarketplaceAccount {
+  id                String         @id @default(uuid()) @db.Uuid
+  marketplace       Marketplace
+  name              String
+  environment       ApiEnvironment @default(SANDBOX)
+  externalAccountId String?        @map("external_account_id")
+  status            AccountStatus  @default(NOT_CONNECTED)
+  connectedAt       DateTime?      @map("connected_at")
+  settings          Json           @default("{}")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  credential        IntegrationCredential?
+  syncStates        SyncState[]
+  listings          MarketplaceListing[]
+  orders            Order[]
+  jobs              ListingPublicationJob[]
+  operations        MarketplaceOperation[]
+
+  @@unique([marketplace, name])
+  @@map("marketplace_accounts")
+}
+
+/// OAuth tokens / API secrets, encrypted with AES-256-GCM. Never returned by any API.
+model IntegrationCredential {
+  id                    String             @id @default(uuid()) @db.Uuid
+  accountId             String             @unique @map("account_id") @db.Uuid
+  ciphertext            String
+  iv                    String
+  authTag               String             @map("auth_tag")
+  keyVersion            Int                @default(1) @map("key_version")
+  scopes                String[]
+  accessTokenExpiresAt  DateTime?          @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime?          @map("refresh_token_expires_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+  account               MarketplaceAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("integration_credentials")
+}
+
+model SyncState {
+  id            String             @id @default(uuid()) @db.Uuid
+  accountId     String             @map("account_id") @db.Uuid
+  resource      String // orders, listings, inventory, fees, settlements
+  cursor        String?
+  status        String             @default("IDLE")
+  lastSuccessAt DateTime?          @map("last_success_at")
+  lastAttemptAt DateTime?          @map("last_attempt_at")
+  lastError     String?            @map("last_error")
+  account       MarketplaceAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, resource])
+  @@map("sync_states")
+}
+
+enum ListingStatus {
+  INCOMPLETE
+  DRAFT
+  VALIDATION_FAILED
+  AWAITING_APPROVAL
+  APPROVED
+  PUBLISHING
+  ACTIVE
+  PUBLICATION_FAILED
+  PAUSED
+  ENDED
+  ARCHIVED
+}
+
+model MarketplaceListing {
+  id                 String             @id @default(uuid()) @db.Uuid
+  productId          String             @map("product_id") @db.Uuid
+  variantId          String             @map("variant_id") @db.Uuid
+  accountId          String             @map("account_id") @db.Uuid
+  marketplace        Marketplace
+  status             ListingStatus      @default(INCOMPLETE)
+  /// Marketplace-specific SKU (may differ from the master SKU).
+  sku                String
+  externalListingId  String?            @map("external_listing_id")
+  externalOfferId    String?            @map("external_offer_id")
+  price              Decimal?           @db.Decimal(14, 4)
+  currency           String             @db.Char(3)
+  quantity           Int                @default(0)
+  allocation         Int?
+  autoPaused         Boolean            @default(false) @map("auto_paused")
+  currentVersionId   String?            @unique @map("current_version_id") @db.Uuid
+  publishedVersionId String?            @unique @map("published_version_id") @db.Uuid
+  lastPublishedAt    DateTime?          @map("last_published_at")
+  lastError          String?            @map("last_error")
+  assignedToId       String?            @map("assigned_to_id") @db.Uuid
+  createdById        String?            @map("created_by_id") @db.Uuid
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+  product            Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant            ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  account            MarketplaceAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  versions           ListingVersion[]   @relation("ListingVersions")
+  currentVersion     ListingVersion?    @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+  publishedVersion   ListingVersion?    @relation("PublishedVersion", fields: [publishedVersionId], references: [id])
+  statusHistory      ListingStatusHistory[]
+  jobs               ListingPublicationJob[]
+  orderLines         OrderLine[]
+
+  @@unique([accountId, sku])
+  @@unique([accountId, externalListingId])
+  @@index([status])
+  @@index([variantId])
+  @@index([marketplace, status])
+  @@map("marketplace_listings")
+}
+
+/// Immutable snapshot of listing content. Drafts are versions that are not yet published;
+/// editing a published listing creates a new version (the listing draft) without touching
+/// the live one until it is re-approved and republished.
+model ListingVersion {
+  id            String             @id @default(uuid()) @db.Uuid
+  listingId     String             @map("listing_id") @db.Uuid
+  version       Int
+  content       Json
+  createdById   String?            @map("created_by_id") @db.Uuid
+  createdAt     DateTime           @default(now()) @map("created_at")
+  submittedById String?            @map("submitted_by_id") @db.Uuid
+  submittedAt   DateTime?          @map("submitted_at")
+  approvedById  String?            @map("approved_by_id") @db.Uuid
+  approvedAt    DateTime?          @map("approved_at")
+  rejectedById  String?            @map("rejected_by_id") @db.Uuid
+  rejectedAt    DateTime?          @map("rejected_at")
+  reviewNote    String?            @map("review_note")
+  listing       MarketplaceListing @relation("ListingVersions", fields: [listingId], references: [id], onDelete: Cascade)
+  currentOf     MarketplaceListing? @relation("CurrentVersion")
+  publishedOf   MarketplaceListing? @relation("PublishedVersion")
+  validations   ListingValidationResult[]
+
+  @@unique([listingId, version])
+  @@map("listing_versions")
+}
+
+model ListingValidationResult {
+  id            String         @id @default(uuid()) @db.Uuid
+  versionId     String         @map("version_id") @db.Uuid
+  valid         Boolean
+  complete      Boolean
+  blockingCount Int            @map("blocking_count")
+  issues        Json
+  ranAt         DateTime       @default(now()) @map("ran_at")
+  version       ListingVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@index([versionId, ranAt])
+  @@map("listing_validation_results")
+}
+
+model ListingStatusHistory {
+  id        String             @id @default(uuid()) @db.Uuid
+  listingId String             @map("listing_id") @db.Uuid
+  fromStatus ListingStatus     @map("from_status")
+  toStatus   ListingStatus     @map("to_status")
+  event     String
+  actorId   String?            @map("actor_id") @db.Uuid
+  note      String?
+  createdAt DateTime           @default(now()) @map("created_at")
+  listing   MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId, createdAt])
+  @@map("listing_status_history")
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+model ListingPublicationJob {
+  id             String             @id @default(uuid()) @db.Uuid
+  listingId      String             @map("listing_id") @db.Uuid
+  versionId      String             @map("version_id") @db.Uuid
+  accountId      String             @map("account_id") @db.Uuid
+  batchId        String?            @map("batch_id") @db.Uuid
+  operation      String // CREATE, REVISE, UPDATE_PRICE_QUANTITY, PAUSE, END
+  status         JobStatus          @default(QUEUED)
+  /// One job per listing version and operation: retries reuse the same key so a
+  /// listing is never created twice on the marketplace.
+  idempotencyKey String             @unique @map("idempotency_key")
+  attempts       Int                @default(0)
+  maxAttempts    Int                @default(5) @map("max_attempts")
+  nextAttemptAt  DateTime?          @map("next_attempt_at")
+  requestedById  String?            @map("requested_by_id") @db.Uuid
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+  listing        MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  account        MarketplaceAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([status, nextAttemptAt])
+  @@map("listing_publication_jobs")
+}
+
+/// Log of every call made to a marketplace API (spec §20).
+model MarketplaceOperation {
+  id            String             @id @default(uuid()) @db.Uuid
+  accountId     String             @map("account_id") @db.Uuid
+  operation     String
+  entityType    String?            @map("entity_type")
+  entityId      String?            @map("entity_id")
+  jobId         String?            @map("job_id") @db.Uuid
+  status        String // SUCCEEDED, FAILED_TRANSIENT, FAILED_PERMANENT, UNSUPPORTED
+  errorCode     String?            @map("error_code")
+  errorMessage  String?            @map("error_message")
+  readableError String?            @map("readable_error")
+  retryCount    Int                @default(0) @map("retry_count")
+  nextAction    String?            @map("next_action")
+  httpStatus    Int?               @map("http_status")
+  durationMs    Int?               @map("duration_ms")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  account       MarketplaceAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, createdAt])
+  @@index([entityType, entityId])
+  @@map("marketplace_operations")
+}
+
+// ───────────────────────────── Orders ─────────────────────────────
+
+model Order {
+  id               String             @id @default(uuid()) @db.Uuid
+  orderNumber      Int                @unique @default(autoincrement()) @map("order_number")
+  accountId        String             @map("account_id") @db.Uuid
+  marketplace      Marketplace
+  externalOrderId  String             @map("external_order_id")
+  status           String // PENDING, PAID, AWAITING_DISPATCH, DISPATCHED, DELIVERED, CANCELLED, REFUNDED, PARTIALLY_REFUNDED
+  orderedAt        DateTime           @map("ordered_at")
+  dispatchBy       DateTime?          @map("dispatch_by")
+  currency         String             @db.Char(3)
+  pricesIncludeTax Boolean            @default(true) @map("prices_include_tax")
+  taxTreatment     String             @default("seller_liable") @map("tax_treatment")
+  settled          Boolean            @default(false)
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  account          MarketplaceAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  customer         OrderCustomer?
+  lines            OrderLine[]
+  statusHistory    OrderStatusHistory[]
+  fulfilments      Fulfilment[]
+  refunds          Refund[]
+  returns          Return[]
+  fees             ActualFee[]
+
+  @@unique([accountId, externalOrderId])
+  @@index([orderedAt])
+  @@index([status, dispatchBy])
+  @@map("orders")
+}
+
+/// Customer PII lives in its own table so access can be restricted (orders.customer_pii)
+/// and purged after the retention period without losing financial history.
+model OrderCustomer {
+  orderId     String    @id @map("order_id") @db.Uuid
+  name        String?
+  email       String?
+  phone       String?
+  line1       String?
+  line2       String?
+  city        String?
+  region      String?
+  postcode    String?
+  country     String?   @db.Char(2)
+  purgeAfter  DateTime? @map("purge_after")
+  purgedAt    DateTime? @map("purged_at")
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_customers")
+}
+
+model OrderLine {
+  id              String              @id @default(uuid()) @db.Uuid
+  orderId         String              @map("order_id") @db.Uuid
+  externalLineId  String              @map("external_line_id")
+  variantId       String?             @map("variant_id") @db.Uuid
+  listingId       String?             @map("listing_id") @db.Uuid
+  sku             String
+  title           String
+  quantity        Int
+  unitPrice       Decimal             @map("unit_price") @db.Decimal(14, 4)
+  shippingCharged Decimal             @default(0) @map("shipping_charged") @db.Decimal(14, 4)
+  sellerDiscount  Decimal             @default(0) @map("seller_discount") @db.Decimal(14, 4)
+  taxAmount       Decimal?            @map("tax_amount") @db.Decimal(14, 4)
+  /// Cost record in effect at the time of sale (snapshot reference).
+  costRecordId    String?             @map("cost_record_id") @db.Uuid
+  fulfilmentCost  Decimal?            @map("fulfilment_cost") @db.Decimal(14, 4)
+  order           Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant         ProductVariant?     @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  listing         MarketplaceListing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  costRecord      CostRecord?         @relation(fields: [costRecordId], references: [id])
+  profit          ProfitCalculation[]
+
+  @@unique([orderId, externalLineId])
+  @@index([variantId])
+  @@map("order_lines")
+}
+
+model OrderStatusHistory {
+  id         String   @id @default(uuid()) @db.Uuid
+  orderId    String   @map("order_id") @db.Uuid
+  fromStatus String?  @map("from_status")
+  toStatus   String   @map("to_status")
+  source     String
+  createdAt  DateTime @default(now()) @map("created_at")
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("order_status_history")
+}
+
+model Fulfilment {
+  id               String     @id @default(uuid()) @db.Uuid
+  orderId          String     @map("order_id") @db.Uuid
+  status           String // PENDING, SUPPLIER_ORDERED, SHIPPED, DELIVERED, CANCELLED
+  supplierId       String?    @map("supplier_id") @db.Uuid
+  supplierOrderRef String?    @map("supplier_order_ref")
+  checklist        Json?
+  /// Dispatch is only recorded once confirmed (carrier scan, supplier tracking or marketplace ack).
+  confirmedAt      DateTime?  @map("confirmed_at")
+  confirmedSource  String?    @map("confirmed_source")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+  order            Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shipments        Shipment[]
+
+  @@map("fulfilments")
+}
+
+model Shipment {
+  id                     String     @id @default(uuid()) @db.Uuid
+  fulfilmentId           String     @map("fulfilment_id") @db.Uuid
+  carrier                String?
+  service                String?
+  trackingNumber         String?    @map("tracking_number")
+  shippedAt              DateTime?  @map("shipped_at")
+  deliveredAt            DateTime?  @map("delivered_at")
+  labelCost              Decimal?   @map("label_cost") @db.Decimal(14, 4)
+  currency               String?    @db.Char(3)
+  pushedToMarketplaceAt  DateTime?  @map("pushed_to_marketplace_at")
+  fulfilment             Fulfilment @relation(fields: [fulfilmentId], references: [id], onDelete: Cascade)
+
+  @@index([trackingNumber])
+  @@map("shipments")
+}
+
+model Refund {
+  id               String    @id @default(uuid()) @db.Uuid
+  orderId          String    @map("order_id") @db.Uuid
+  orderLineId      String?   @map("order_line_id") @db.Uuid
+  externalRefundId String?   @map("external_refund_id")
+  amount           Decimal   @db.Decimal(14, 4)
+  taxAmount        Decimal?  @map("tax_amount") @db.Decimal(14, 4)
+  currency         String    @db.Char(3)
+  reason           String?
+  refundedAt       DateTime  @map("refunded_at")
+  source           String
+  order            Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, externalRefundId])
+  @@map("refunds")
+}
+
+model Return {
+  id                 String    @id @default(uuid()) @db.Uuid
+  orderId            String    @map("order_id") @db.Uuid
+  orderLineId        String?   @map("order_line_id") @db.Uuid
+  externalReturnId   String?   @map("external_return_id")
+  status             String // REQUESTED, APPROVED, IN_TRANSIT, RECEIVED, CLOSED, REJECTED
+  reason             String?
+  returnShippingCost Decimal?  @map("return_shipping_cost") @db.Decimal(14, 4)
+  currency           String?   @db.Char(3)
+  restockable        Boolean?
+  receivedAt         DateTime? @map("received_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  order              Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, externalReturnId])
+  @@map("returns")
+}
+
+// ───────────────────────────── Finance ─────────────────────────────
+
+model FeeRule {
+  id            String      @id @default(uuid()) @db.Uuid
+  name          String
+  marketplace   Marketplace
+  feeType       String      @map("fee_type")
+  basis         String
+  currency      String      @db.Char(3)
+  percent       Decimal?    @db.Decimal(9, 4)
+  tiers         Json?
+  fixed         Decimal?    @db.Decimal(14, 4)
+  minFee        Decimal?    @map("min_fee") @db.Decimal(14, 4)
+  maxFee        Decimal?    @map("max_fee") @db.Decimal(14, 4)
+  categoryIds   String[]    @map("category_ids")
+  overrideGroup String?     @map("override_group")
+  effectiveFrom DateTime    @default(now()) @map("effective_from")
+  effectiveTo   DateTime?   @map("effective_to")
+  active        Boolean     @default(true)
+  notes         String?
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  @@index([marketplace, active])
+  @@map("fee_rules")
+}
+
+/// Fees actually charged by the marketplace (from finance APIs / settlement reports).
+model ActualFee {
+  id           String      @id @default(uuid()) @db.Uuid
+  orderId      String?     @map("order_id") @db.Uuid
+  orderLineId  String?     @map("order_line_id") @db.Uuid
+  marketplace  Marketplace
+  feeType      String      @map("fee_type")
+  name         String
+  amount       Decimal     @db.Decimal(14, 4)
+  currency     String      @db.Char(3)
+  source       String
+  externalRef  String      @map("external_ref")
+  settlementId String?     @map("settlement_id")
+  postedAt     DateTime    @map("posted_at")
+  order        Order?      @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@unique([source, externalRef])
+  @@index([orderId])
+  @@map("actual_fees")
+}
+
+model CurrencyRate {
+  id        String   @id @default(uuid()) @db.Uuid
+  base      String   @db.Char(3)
+  quote     String   @db.Char(3)
+  rate      Decimal  @db.Decimal(18, 8)
+  asOf      DateTime @map("as_of")
+  source    String
+  createdById String? @map("created_by_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([base, quote, asOf, source])
+  @@index([base, quote, asOf])
+  @@map("currency_rates")
+}
+
+model Expense {
+  id          String    @id @default(uuid()) @db.Uuid
+  date        DateTime  @db.Date
+  category    String // SOFTWARE, ADVERTISING, ACCOUNTANCY, STORAGE, PACKAGING, RETURNS_HANDLING, BANK_CHARGES, OTHER
+  description String
+  amount      Decimal   @db.Decimal(14, 4)
+  currency    String    @db.Char(3)
+  supplierId  String?   @map("supplier_id") @db.Uuid
+  marketplace Marketplace?
+  notes       String?
+  receiptKey  String?   @map("receipt_key")
+  /// Shared-cost allocation rule key (e.g. "by_revenue", "by_units", "none").
+  allocation  String    @default("none")
+  /// Set when the same cost is also attributed at order level; such expenses are excluded
+  /// from operating profit to prevent double counting.
+  attributedToOrders Boolean @default(false) @map("attributed_to_orders")
+  createdById String?   @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  supplier    Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+
+  @@index([date])
+  @@map("expenses")
+}
+
+model ProfitCalculation {
+  id           String    @id @default(uuid()) @db.Uuid
+  orderLineId  String    @map("order_line_id") @db.Uuid
+  status       String // estimated, partially_reconciled, confirmed
+  currency     String    @db.Char(3)
+  netRevenue   Decimal   @map("net_revenue") @db.Decimal(14, 4)
+  totalCost    Decimal   @map("total_cost") @db.Decimal(14, 4)
+  totalFees    Decimal   @map("total_fees") @db.Decimal(14, 4)
+  netProfit    Decimal   @map("net_profit") @db.Decimal(14, 4)
+  marginPercent Decimal? @map("margin_percent") @db.Decimal(9, 4)
+  reportingCurrency String? @map("reporting_currency") @db.Char(3)
+  reportingNetProfit Decimal? @map("reporting_net_profit") @db.Decimal(14, 4)
+  breakdown    Json
+  isCurrent    Boolean   @default(true) @map("is_current")
+  calculatedAt DateTime  @default(now()) @map("calculated_at")
+  orderLine    OrderLine @relation(fields: [orderLineId], references: [id], onDelete: Cascade)
+
+  @@index([orderLineId, isCurrent])
+  @@map("profit_calculations")
+}
+
+// ───────────────────────────── Platform ─────────────────────────────
+
+model AutomationRule {
+  id               String    @id @default(uuid()) @db.Uuid
+  name             String
+  trigger          String // SCHEDULE, SUPPLIER_PRICE_CHANGED, STOCK_CHANGED, LISTING_FAILED, DRAFT_SUBMITTED, ORDER_IMPORTED
+  conditions       Json
+  actions          Json
+  schedule         String?
+  enabled          Boolean   @default(false)
+  requiresApproval Boolean   @default(true) @map("requires_approval")
+  lastRunAt        DateTime? @map("last_run_at")
+  createdById      String?   @map("created_by_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  runs             AutomationRun[]
+
+  @@map("automation_rules")
+}
+
+model AutomationRun {
+  id         String         @id @default(uuid()) @db.Uuid
+  ruleId     String         @map("rule_id") @db.Uuid
+  status     String
+  summary    Json?
+  startedAt  DateTime       @default(now()) @map("started_at")
+  finishedAt DateTime?      @map("finished_at")
+  rule       AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([ruleId, startedAt])
+  @@map("automation_runs")
+}
+
+model Notification {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String?   @map("user_id") @db.Uuid
+  roleKey    String?   @map("role_key")
+  type       String
+  severity   String    @default("info")
+  title      String
+  body       String    @default("")
+  entityType String?   @map("entity_type")
+  entityId   String?   @map("entity_id")
+  readAt     DateTime? @map("read_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         BigInt   @id @default(autoincrement())
+  actorId    String?  @map("actor_id") @db.Uuid
+  actorEmail String?  @map("actor_email")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  before     Json?
+  after      Json?
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model SystemSetting {
+  key         String   @id
+  value       Json
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+model SavedView {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  page      String
+  name      String
+  filters   Json
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, page, name])
+  @@map("saved_views")
+}
+
+enum ImportStatus {
+  UPLOADED
+  VALIDATED
+  IMPORTING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+  FAILED
+  CANCELLED
+}
+
+model ImportJob {
+  id            String       @id @default(uuid()) @db.Uuid
+  kind          String       @default("products")
+  fileName      String       @map("file_name")
+  status        ImportStatus @default(UPLOADED)
+  headers       String[]
+  mapping       Json?
+  totalRows     Int          @default(0) @map("total_rows")
+  validRows     Int          @default(0) @map("valid_rows")
+  errorRows     Int          @default(0) @map("error_rows")
+  processedRows Int          @default(0) @map("processed_rows")
+  createdCount  Int          @default(0) @map("created_count")
+  updatedCount  Int          @default(0) @map("updated_count")
+  failedCount   Int          @default(0) @map("failed_count")
+  createdById   String?      @map("created_by_id") @db.Uuid
+  createdAt     DateTime     @default(now()) @map("created_at")
+  startedAt     DateTime?    @map("started_at")
+  finishedAt    DateTime?    @map("finished_at")
+  rows          ImportRow[]
+
+  @@index([createdAt])
+  @@map("import_jobs")
+}
+
+model ImportRow {
+  id        String    @id @default(uuid()) @db.Uuid
+  jobId     String    @map("job_id") @db.Uuid
+  rowNumber Int       @map("row_number")
+  raw       Json
+  data      Json?
+  /// PENDING, VALID, INVALID, DUPLICATE, IMPORTED, FAILED
+  status    String    @default("PENDING")
+  action    String? // CREATE, UPDATE, NOOP
+  errors    Json?
+  importedAt DateTime? @map("imported_at")
+  job       ImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, rowNumber])
+  @@index([jobId, status])
+  @@map("import_rows")
+}
+
+/// Editable per-marketplace listing template. Placeholders such as {{title}}, {{brand}},
+/// {{colour}}, {{size}}, {{material}} are filled from verified product data only.
+model ListingTemplate {
+  id                  String      @id @default(uuid()) @db.Uuid
+  name                String
+  marketplace         Marketplace
+  titleTemplate       String      @map("title_template")
+  descriptionTemplate String      @map("description_template")
+  bulletTemplates     String[]    @map("bullet_templates")
+  defaults            Json        @default("{}")
+  isDefault           Boolean     @default(false) @map("is_default")
+  createdById         String?     @map("created_by_id") @db.Uuid
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  @@unique([marketplace, name])
+  @@map("listing_templates")
+}
