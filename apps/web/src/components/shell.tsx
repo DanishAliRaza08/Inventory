@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { api, fetcher } from '@/lib/api';
 import { useMe } from '@/lib/session';
@@ -93,12 +93,30 @@ function GlobalSearch() {
   );
 }
 
+/** Closes a popover on outside click or Escape. */
+function useDismiss(open: boolean, close: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && close();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open, close]);
+  return ref;
+}
+
 function Notifications() {
   const [open, setOpen] = useState(false);
+  const ref = useDismiss(open, () => setOpen(false));
   const { data, mutate } = useSWR<Array<{ id: string; title: string; body: string; severity: string; readAt: string | null; createdAt: string; entityType: string | null; entityId: string | null }>>('/notifications', fetcher, { refreshInterval: 60_000 });
   const unread = data?.filter((n) => !n.readAt).length ?? 0;
   return (
-    <div className="relative">
+    <div className="relative" ref={ref}>
       <button className="btn" aria-label={`Notifications (${unread} unread)`} onClick={() => setOpen(!open)}>
         🔔{unread > 0 && <span className="rounded-full px-1.5 text-xs text-white" style={{ background: 'var(--critical)' }}>{unread}</span>}
       </button>
@@ -128,8 +146,9 @@ function Notifications() {
 function AccountMenu() {
   const me = useMe();
   const [open, setOpen] = useState(false);
+  const ref = useDismiss(open, () => setOpen(false));
   return (
-    <div className="relative">
+    <div className="relative" ref={ref}>
       <button className="btn" onClick={() => setOpen(!open)} aria-haspopup="menu">
         <span className="hidden sm:inline">{me.name}</span>
         <span className="sm:hidden">☺</span>

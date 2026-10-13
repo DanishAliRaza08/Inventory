@@ -23,7 +23,8 @@ async function request<T>(method: string, path: string, body?: unknown, isForm =
   const text = await res.text();
   const json = text ? (() => { try { return JSON.parse(text); } catch { return { message: text }; } })() : {};
   if (!res.ok) {
-    if (res.status === 401 && typeof window !== 'undefined' && !path.startsWith('/auth/')) {
+    // Sign-in and MFA endpoints report their own errors; everything else sends the user to sign in.
+    if (res.status === 401 && typeof window !== 'undefined' && !path.startsWith('/auth/login') && !path.startsWith('/auth/mfa')) {
       const code = (json as { code?: string }).code;
       window.location.href = code === 'MFA_REQUIRED' ? '/login?mfa=1' : `/login?next=${encodeURIComponent(window.location.pathname)}`;
     }

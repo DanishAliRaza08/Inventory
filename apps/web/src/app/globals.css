@@ -55,6 +55,7 @@ body {
   background: var(--plane);
   color: var(--text-primary);
 }
+@layer components {
 .card {
   @apply rounded-lg border border-line bg-surface;
 }
@@ -83,4 +84,5 @@ body {
 .num {
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
 }

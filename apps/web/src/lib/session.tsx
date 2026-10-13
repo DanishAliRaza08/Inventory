@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useEffect } from 'react';
 import useSWR from 'swr';
 import { fetcher } from './api';
 
@@ -19,7 +19,11 @@ const Ctx = createContext<Me | null>(null);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const { data } = useSWR<Me>('/auth/me', fetcher, { revalidateOnFocus: false });
-  if (!data) return <div className="p-8 text-sm text-ink2">Loading…</div>;
+  useEffect(() => {
+    // A session that has not completed its MFA step can only enter the code.
+    if (data && data.mfaEnabled && !data.mfaVerified) window.location.href = '/login?mfa=1';
+  }, [data]);
+  if (!data || (data.mfaEnabled && !data.mfaVerified)) return <div className="p-8 text-sm text-ink2">Loading…</div>;
   return <Ctx.Provider value={data}>{children}</Ctx.Provider>;
 }
 

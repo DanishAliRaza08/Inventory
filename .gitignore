@@ -10,3 +10,5 @@ apps/api/uploads/
 .turbo/
 *.tsbuildinfo
 next-env.d.ts
+e2e/test-results/
+e2e/playwright-report/
