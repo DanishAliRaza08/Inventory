@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.next/
+coverage/
+*.log
+.env
+.env.*.local
+!.env.example
+apps/api/uploads/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts

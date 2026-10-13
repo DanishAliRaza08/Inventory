@@ -1,0 +1,12 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+onlyBuiltDependencies:
+  - "@prisma/client"
+  - "@prisma/engines"
+  - "prisma"
+  - "@nestjs/core"
+  - "esbuild"
+  - "msgpackr-extract"
+  - "sharp"
+  - "unrs-resolver"

@@ -1,0 +1,21 @@
+{
+  "name": "fashion-rockstar-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Fashion Rockstar LTD multi-channel inventory, profit and listing management platform",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
+    "test:core": "pnpm --filter @fr/core test",
+    "test:api": "pnpm --filter @fr/api test",
+    "dev:api": "pnpm --filter @fr/api dev",
+    "dev:web": "pnpm --filter @fr/web dev",
+    "db:migrate": "pnpm --filter @fr/api prisma:migrate",
+    "db:seed": "pnpm --filter @fr/api seed"
+  }
+}
