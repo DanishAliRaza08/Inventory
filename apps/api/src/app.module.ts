@@ -31,6 +31,10 @@ import { PublicationService } from './listings/publication.service';
 import { RepricingService } from './listings/repricing.service';
 import { NotificationsController, NotificationsService } from './notifications/notifications.service';
 import { PrismaModule } from './prisma/prisma.module';
+import { ReportsController } from './reports/reports.controller';
+import { ReportsService } from './reports/reports.service';
+import { AutomationController } from './automation/automation.controller';
+import { AutomationService } from './automation/automation.service';
 import { OrdersController } from './orders/orders.controller';
 import { OrdersService } from './orders/orders.service';
 import { SyncService } from './integrations/sync.service';
@@ -59,12 +63,12 @@ import { UsersService } from './users/users.service';
   controllers: [
     HealthController, AuthController, UsersController, AuditController, SettingsController, NotificationsController,
     ProductsController, ImagesController, SuppliersController, CostsController, InventoryController,
-    FinanceController, ListingsController, AccountsController, ImportsController, DashboardController, CustomerPiiController, OrdersController,
+    FinanceController, ListingsController, AccountsController, ImportsController, DashboardController, CustomerPiiController, OrdersController, AutomationController, ReportsController,
   ],
   providers: [
     CryptoService, AuditService, AuthService, SettingsService, NotificationsService, UsersService, StorageService,
     ProductsService, SuppliersService, CostsService, InventoryService, ProfitService,
-    ListingsService, PublicationService, RepricingService, ConnectorRegistry, AccountContextService, ImageUrlService, ImportsService, DashboardService, CustomerPiiService, OrdersService, SyncService, InventorySyncService, SupplierSyncService,
+    ListingsService, PublicationService, RepricingService, ConnectorRegistry, AccountContextService, ImageUrlService, ImportsService, DashboardService, CustomerPiiService, OrdersService, SyncService, InventorySyncService, SupplierSyncService, AutomationService, ReportsService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_INTERCEPTOR, useClass: SerializeInterceptor },

@@ -17,6 +17,7 @@
     "openapi": "ts-node --transpile-only scripts/export-openapi.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.133.0",
     "@fr/core": "workspace:*",
     "@nestjs/common": "11.1.6",
     "@nestjs/core": "11.1.6",

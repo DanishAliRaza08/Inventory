@@ -169,13 +169,13 @@ describe('eBay UK via the Trading API (mock marketplace)', () => {
     await owner.put('/api/settings/controls.inventory_sync_enabled', { value: true });
     await owner.patch(`/api/variants/${l.variantId}/inventory/settings`, { policy: 'AUTO_SYNC', safetyStock: 2 });
     await owner.post(`/api/integrations/accounts/${acc.EBAY_UK}/sync/inventory`);
-    const state = await (await fetch(`http://localhost:${MOCK_PORT}/mock/state`)).json();
+    const state = (await (await fetch(`http://localhost:${MOCK_PORT}/mock/state`)).json()) as any;
     const onEbay = state.EBAY_UK.find((x: { sku: string }) => x.sku === 'FR-10001-12');
     const rec = await t.prisma.inventoryRecord.findFirstOrThrow({ where: { variantId: l.variantId } });
     expect(onEbay.quantity).toBe(rec.available - 2);
     const rp = await approver.post(`/api/listings/${l.id}/reprice`, { price: '27.49', note: 'test' });
     expect(rp.body.queued).toBe(true);
-    const after = await (await fetch(`http://localhost:${MOCK_PORT}/mock/state`)).json();
+    const after = (await (await fetch(`http://localhost:${MOCK_PORT}/mock/state`)).json()) as any;
     expect(after.EBAY_UK.find((x: { sku: string }) => x.sku === 'FR-10001-12').price).toBe(27.49);
     expect((await t.prisma.marketplaceListing.findUniqueOrThrow({ where: { id: l.id } })).price!.toString()).toBe('27.49');
   });

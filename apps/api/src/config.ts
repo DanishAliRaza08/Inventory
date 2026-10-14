@@ -66,7 +66,7 @@ const EnvSchema = z.object({
 
   // ── AI listing assistant (Claude) ──
   ANTHROPIC_API_KEY: z.string().default(''),
-  AI_MODEL: z.string().default('claude-sonnet-5-5'),
+  AI_MODEL: z.string().default('claude-opus-5-5'),
 
   /** Background schedules (minutes). */
   SYNC_ORDERS_EVERY_MIN: z.coerce.number().default(10),
