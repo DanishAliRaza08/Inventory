@@ -183,6 +183,7 @@ export function calculateOrderLineProfit(input: OrderLineProfitInput): ProfitBre
       at: input.soldAt,
     });
     for (const f of est) feeLines.push({ name: f.name, feeType: f.feeType, amount: f.amount, explanation: f.explanation, source: 'estimate' });
+    if (est.length === 0) warnings.push('No fee rule was in effect for this marketplace on the sale date: marketplace fees are assumed to be zero until actual fees are imported.');
   } else {
     warnings.push('No fee rules configured and no actual fees imported: marketplace fees are assumed to be zero.');
   }

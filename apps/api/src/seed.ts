@@ -49,14 +49,16 @@ export async function seedDemo(prisma: PrismaClient) {
   }
   if ((await prisma.feeRule.count()) === 0) {
     const demo = 'DEMO example rate — replace with the rates on your marketplace account.';
+    // Effective from a year back so historic demo orders have an estimate before actual fees arrive.
+    const effectiveFrom = new Date(Date.now() - 365 * 86_400_000);
     await prisma.feeRule.createMany({
       data: [
-        { name: 'DEMO selling fee', marketplace: 'EBAY_UK', feeType: 'final_value', basis: 'order_total_incl_tax', currency: 'GBP', percent: '12', overrideGroup: 'fvf', notes: demo },
-        { name: 'DEMO per-order fee', marketplace: 'EBAY_UK', feeType: 'per_order', basis: 'per_order', currency: 'GBP', fixed: '0.30', notes: demo },
-        { name: 'DEMO selling fee', marketplace: 'EBAY_US', feeType: 'final_value', basis: 'order_total_incl_tax', currency: 'USD', percent: '13', overrideGroup: 'fvf', notes: demo },
-        { name: 'DEMO per-order fee', marketplace: 'EBAY_US', feeType: 'per_order', basis: 'per_order', currency: 'USD', fixed: '0.30', notes: demo },
-        { name: 'DEMO referral fee', marketplace: 'AMAZON_UK', feeType: 'final_value', basis: 'order_total_incl_tax', currency: 'GBP', percent: '15', notes: demo },
-        { name: 'DEMO commission', marketplace: 'TIKTOK_UK', feeType: 'final_value', basis: 'order_total_incl_tax', currency: 'GBP', percent: '9', notes: demo },
+        { name: 'DEMO selling fee', marketplace: 'EBAY_UK', feeType: 'final_value', basis: 'order_total_incl_tax', currency: 'GBP', percent: '12', overrideGroup: 'fvf', notes: demo, effectiveFrom },
+        { name: 'DEMO per-order fee', marketplace: 'EBAY_UK', feeType: 'per_order', basis: 'per_order', currency: 'GBP', fixed: '0.30', notes: demo, effectiveFrom },
+        { name: 'DEMO selling fee', marketplace: 'EBAY_US', feeType: 'final_value', basis: 'order_total_incl_tax', currency: 'USD', percent: '13', overrideGroup: 'fvf', notes: demo, effectiveFrom },
+        { name: 'DEMO per-order fee', marketplace: 'EBAY_US', feeType: 'per_order', basis: 'per_order', currency: 'USD', fixed: '0.30', notes: demo, effectiveFrom },
+        { name: 'DEMO referral fee', marketplace: 'AMAZON_UK', feeType: 'final_value', basis: 'order_total_incl_tax', currency: 'GBP', percent: '15', notes: demo, effectiveFrom },
+        { name: 'DEMO commission', marketplace: 'TIKTOK_UK', feeType: 'final_value', basis: 'order_total_incl_tax', currency: 'GBP', percent: '9', notes: demo, effectiveFrom },
       ],
     });
   }

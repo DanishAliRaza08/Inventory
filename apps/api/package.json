@@ -9,6 +9,7 @@
     "start": "node dist/src/main.js",
     "worker": "node dist/src/worker.js",
     "mock": "ts-node --transpile-only src/mock/main-mock.ts",
+    "demo": "ts-node --transpile-only src/demo/main-demo.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
