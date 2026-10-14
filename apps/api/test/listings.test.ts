@@ -144,10 +144,11 @@ describe('listing builder and approval workflow', () => {
     expect((await approver.get(`/api/listings/${body.listingId}`)).body.status).toBe('APPROVED');
   });
 
-  it('official connectors report not-implemented operations honestly', async () => {
+  it('capabilities distinguish built connectors from ones verified with real credentials', async () => {
     const caps = await owner.get('/api/integrations/capabilities');
-    expect(caps.body.matrix.EBAY_UK.CREATE_LISTING).toMatchObject({ status: 'planned' });
+    expect(caps.body.matrix.EBAY_UK.CREATE_LISTING).toMatchObject({ status: 'built', api: expect.stringMatching(/AddFixedPriceItem/) });
     expect(caps.body.matrix.AMAZON_UK.CREATE_LISTING.api).toMatch(/Listings Items API/);
+    expect(caps.body.configured.ebay).toBe(false); // no credentials in the test environment
   });
 
   it('blocks self-approval and requires approver compliance sign-off for restricted products', async () => {

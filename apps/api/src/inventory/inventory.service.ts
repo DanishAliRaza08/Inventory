@@ -20,6 +20,7 @@ export const MOVEMENT_TYPES = {
   RESERVE: { from: 'AVAILABLE', to: 'RESERVED' },
   RELEASE: { from: 'RESERVED', to: 'AVAILABLE' },
   COMMIT: { from: 'RESERVED', to: 'COMMITTED' },
+  UNCOMMIT: { from: 'COMMITTED', to: 'AVAILABLE' },
   SHIP: { from: 'COMMITTED', to: 'EXTERNAL' },
   RETURN: { from: 'EXTERNAL', to: 'RETURNED' },
   RESTOCK: { from: 'RETURNED', to: 'AVAILABLE' },
@@ -153,7 +154,8 @@ export class InventoryService {
     if (!v) throw new NotFoundException();
     const rec = v.inventory.find((i) => i.location === 'MAIN') ?? (await this.ensureRecord(variantId));
     if (v.product.fulfilmentModel === 'PHYSICAL') {
-      return { ...physicalAvailableToSell(rec), record: rec };
+      const { available, reserved, committed, damaged, returned, safetyStock } = rec;
+      return { ...physicalAvailableToSell({ available, reserved, committed, damaged, returned, safetyStock }), record: rec };
     }
     const settings: DropshipSettings = { ...DEFAULT_DROPSHIP_SETTINGS, ...((rec.dropshipSettings as Partial<DropshipSettings> | null) ?? {}) };
     const primary = v.supplierProducts[0];

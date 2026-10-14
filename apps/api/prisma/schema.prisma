@@ -253,6 +253,8 @@ model Supplier {
   updatedAt         DateTime     @updatedAt @map("updated_at")
   products          SupplierProduct[]
   expenses          Expense[]
+  connection        SupplierConnection?
+  orders            SupplierOrder[]
 
   @@map("suppliers")
 }
@@ -626,6 +628,9 @@ model ListingPublicationJob {
   maxAttempts    Int                @default(5) @map("max_attempts")
   nextAttemptAt  DateTime?          @map("next_attempt_at")
   requestedById  String?            @map("requested_by_id") @db.Uuid
+  /// Operation input (e.g. price/quantity for UPDATE_PRICE_QUANTITY).
+  payload        Json?
+  lastError      String?            @map("last_error")
   createdAt      DateTime           @default(now()) @map("created_at")
   updatedAt      DateTime           @updatedAt @map("updated_at")
   listing        MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
@@ -1091,4 +1096,46 @@ model ListingTemplate {
 
   @@unique([marketplace, name])
   @@map("listing_templates")
+}
+
+/// API connection to a supplier (AliExpress OAuth tokens, CJ access token), encrypted.
+model SupplierConnection {
+  id            String    @id @default(uuid()) @db.Uuid
+  supplierId    String    @unique @map("supplier_id") @db.Uuid
+  status        String    @default("NOT_CONNECTED") // CONNECTED, EXPIRED, ERROR
+  ciphertext    String?
+  iv            String?
+  authTag       String?   @map("auth_tag")
+  keyVersion    Int       @default(1) @map("key_version")
+  expiresAt     DateTime? @map("expires_at")
+  lastSyncAt    DateTime? @map("last_sync_at")
+  lastError     String?   @map("last_error")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  supplier      Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@map("supplier_connections")
+}
+
+/// Order placed with a supplier for a dropshipped customer order (always confirmed by staff).
+model SupplierOrder {
+  id               String    @id @default(uuid()) @db.Uuid
+  supplierId       String    @map("supplier_id") @db.Uuid
+  orderId          String    @map("order_id") @db.Uuid
+  fulfilmentId     String?   @map("fulfilment_id") @db.Uuid
+  externalOrderId  String?   @map("external_order_id")
+  status           String    @default("DRAFT") // DRAFT, PLACED, SHIPPED, FAILED, CANCELLED
+  totalCost        Decimal?  @map("total_cost") @db.Decimal(14, 4)
+  currency         String?   @db.Char(3)
+  trackingNumber   String?   @map("tracking_number")
+  carrier          String?
+  placedById       String?   @map("placed_by_id") @db.Uuid
+  placedAt         DateTime? @map("placed_at")
+  lastError        String?   @map("last_error")
+  idempotencyKey   String    @unique @map("idempotency_key")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  supplier         Supplier  @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@map("supplier_orders")
 }

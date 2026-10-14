@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ListingContentPatch } from './listing-content';
 import { ListingsService } from './listings.service';
 import { PublicationService } from './publication.service';
+import { RepricingService } from './repricing.service';
 
 const ListQuery = zPagination.extend({
   status: z.enum(['INCOMPLETE', 'DRAFT', 'VALIDATION_FAILED', 'AWAITING_APPROVAL', 'APPROVED', 'PUBLISHING', 'ACTIVE', 'PUBLICATION_FAILED', 'PAUSED', 'ENDED', 'ARCHIVED']).optional(),
@@ -47,6 +48,7 @@ const BulkDrafts = z.object({
   ]),
 });
 const SyncFields = z.object({ fields: z.array(z.enum(['title', 'description', 'bulletPoints', 'attributes', 'imageIds', 'gtin', 'brand'])).min(1) });
+const RepriceBody = z.object({ price: zMoneyNonNeg, note: z.string().max(500).optional() });
 const TemplateBody = z.object({
   name: z.string().min(1).max(80),
   marketplace: zMarketplace,
@@ -64,7 +66,28 @@ export class ListingsController {
     private readonly listings: ListingsService,
     private readonly publication: PublicationService,
     private readonly prisma: PrismaService,
+    private readonly repricing: RepricingService,
   ) {}
+
+  @Get('repricing/proposals')
+  @RequirePermissions('listings.read', 'costs.read')
+  proposals() {
+    return this.repricing.proposals();
+  }
+
+  @Post(':id/reprice')
+  @HttpCode(202)
+  @RequirePermissions('listings.approve', 'listings.publish')
+  reprice(@Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(RepriceBody)) body: z.infer<typeof RepriceBody>, @Auth() auth: AuthContext) {
+    return this.repricing.apply(id, body.price, auth, body.note);
+  }
+
+  @Post(':id/category-attributes')
+  @HttpCode(200)
+  @RequirePermissions('listings.write')
+  categoryAttributes(@Param('id', ParseUUIDPipe) id: string, @Auth() auth: AuthContext) {
+    return this.repricing.refreshCategoryAttributes(id, auth);
+  }
 
   @Get()
   @RequirePermissions('listings.read')

@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Put, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Param, ParseUUIDPipe, Post, Put, Query, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
@@ -6,7 +6,8 @@ import { imageSize } from 'image-size';
 import { memoryStorage } from 'multer';
 import { z } from 'zod';
 import { AuditService } from '../audit/audit.service';
-import { Auth, AuthContext, RequirePermissions } from '../auth/decorators';
+import { Auth, AuthContext, Public, RequirePermissions } from '../auth/decorators';
+import { ImageUrlService } from '../storage/image-url.service';
 import { ZodPipe } from '../common/zod';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
@@ -21,7 +22,19 @@ export class ImagesController {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly audit: AuditService,
+    private readonly imageUrls: ImageUrlService,
   ) {}
+
+  /** Signed, expiring public image URL for marketplaces to download (no session). */
+  @Get('public/images/:imageId')
+  @Public()
+  async publicFile(@Param('imageId', ParseUUIDPipe) imageId: string, @Query('exp') exp: string, @Query('sig') sig: string, @Res() res: Response) {
+    if (!this.imageUrls.verify(imageId, exp ?? '', sig ?? '')) throw new ForbiddenException({ code: 'BAD_SIGNATURE', message: 'Invalid or expired image link.' });
+    const img = await this.prisma.productImage.findUniqueOrThrow({ where: { id: imageId } });
+    res.setHeader('Content-Type', `image/${img.format ?? 'jpeg'}`);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(await this.storage.get(img.storageKey));
+  }
 
   @Post('products/:id/images')
   @RequirePermissions('listings.write')

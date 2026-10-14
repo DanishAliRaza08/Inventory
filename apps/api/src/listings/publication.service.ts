@@ -1,14 +1,13 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ListingPublicationJob } from '@prisma/client';
-import type { MarketplaceCode } from '@fr/core';
-import { AuditService } from '../audit/audit.service';
-import { CryptoService } from '../common/crypto.service';
-import { ConnectorRegistry } from '../integrations/connector-registry';
+import { ListingPublicationJob, Prisma } from '@prisma/client';
+import { randomUUID } from 'crypto';
+import { AccountContextService } from '../integrations/account-context.service';
 import { ConnectorResult, PublishPayload } from '../integrations/connector';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { QUEUES, QueueService } from '../queue/queue.service';
 import { SettingsService } from '../settings/settings.service';
+import { ImageUrlService } from '../storage/image-url.service';
 import { ListingContent } from './listing-content';
 import { ListingsService } from './listings.service';
 
@@ -18,6 +17,10 @@ export function backoffMs(attempt: number, random = Math.random()): number {
   return Math.round(base * (0.8 + random * 0.4));
 }
 
+/** Delay between "is it live yet?" checks for marketplaces that review listings (Amazon, TikTok). */
+const CONFIRM_DELAY_MS = 5 * 60_000;
+const CONFIRM_MAX_CHECKS = 300; // ~25 hours
+
 @Injectable()
 export class PublicationService implements OnModuleInit {
   private readonly logger = new Logger(PublicationService.name);
@@ -25,11 +28,10 @@ export class PublicationService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly queue: QueueService,
-    private readonly registry: ConnectorRegistry,
+    private readonly accounts: AccountContextService,
     private readonly listings: ListingsService,
     private readonly settings: SettingsService,
-    private readonly crypto: CryptoService,
-    private readonly audit: AuditService,
+    private readonly imageUrls: ImageUrlService,
     private readonly notifications: NotificationsService,
   ) {}
 
@@ -38,10 +40,10 @@ export class PublicationService implements OnModuleInit {
   }
 
   async dispatch(job: Pick<ListingPublicationJob, 'id' | 'attempts'>, delayMs?: number) {
-    await this.queue.enqueue(QUEUES.PUBLICATION, { jobId: job.id }, { jobId: `${job.id}:${job.attempts}`, delayMs });
+    await this.queue.enqueue(QUEUES.PUBLICATION, { jobId: job.id }, { jobId: `${job.id}:${job.attempts}:${Date.now()}`, delayMs });
   }
 
-  /** Re-dispatch due jobs (e.g. after publishing is re-enabled, or a worker restart). */
+  /** Re-dispatch due jobs (after publishing is re-enabled, worker restarts, confirmation polling). */
   async sweep() {
     if (!(await this.settings.get('controls.publishing_enabled'))) return { dispatched: 0, reason: 'publishing disabled' };
     const due = await this.prisma.listingPublicationJob.findMany({ where: { status: 'QUEUED', nextAttemptAt: { lte: new Date() } }, take: 500 });
@@ -49,118 +51,179 @@ export class PublicationService implements OnModuleInit {
     return { dispatched: due.length };
   }
 
+  /** Queue a price/quantity update for a live listing (used by inventory sync and repricing). */
+  async enqueuePriceQuantity(listingId: string, change: { price?: string; quantity?: number }, reason: string, requestedById?: string) {
+    const l = await this.prisma.marketplaceListing.findUniqueOrThrow({ where: { id: listingId } });
+    if (!l.externalListingId || !l.publishedVersionId) return null;
+    const job = await this.prisma.listingPublicationJob.create({
+      data: {
+        listingId,
+        versionId: l.publishedVersionId,
+        accountId: l.accountId,
+        operation: 'UPDATE_PRICE_QUANTITY',
+        idempotencyKey: `${listingId}:PQ:${randomUUID()}`,
+        payload: { ...change, reason } as Prisma.InputJsonValue,
+        requestedById,
+        nextAttemptAt: new Date(),
+      },
+    });
+    await this.dispatch(job);
+    return job;
+  }
+
+  private async payload(listingId: string, versionId: string): Promise<PublishPayload> {
+    const listing = await this.prisma.marketplaceListing.findUniqueOrThrow({
+      where: { id: listingId },
+      include: { account: true, product: { select: { images: true } }, variant: true },
+    });
+    const version = await this.prisma.listingVersion.findUniqueOrThrow({ where: { id: versionId } });
+    const content = ListingContent.parse(version.content);
+    const imagesById = new Map(listing.product.images.map((i) => [i.id, i]));
+    return {
+      listingId: listing.id,
+      sku: listing.sku,
+      price: listing.price!.toString(),
+      currency: listing.currency,
+      quantity: content.quantityPolicy === 'FIXED' ? content.fixedQuantity ?? 0 : Math.max(listing.quantity, content.quantityPolicy === 'SYNC' ? 0 : 1),
+      content,
+      images: content.imageIds.flatMap((id, i) => (imagesById.has(id) ? [{ url: this.imageUrls.sign(id), isMain: i === 0 }] : [])),
+      externalListingId: listing.externalListingId,
+      externalOfferId: listing.externalOfferId,
+      accountSettings: (listing.account.settings as Record<string, unknown>) ?? {},
+      variant: { sku: listing.variant.sku, size: listing.variant.size, colour: listing.variant.colour, weightGrams: listing.variant.weightGrams },
+    };
+  }
+
   async process(jobId: string): Promise<void> {
-    // Claim the job atomically so two workers can never run it at the same time.
+    // Claim the job atomically so two workers never run it at the same time.
     const claimed = await this.prisma.listingPublicationJob.updateMany({ where: { id: jobId, status: 'QUEUED' }, data: { status: 'RUNNING', attempts: { increment: 1 } } });
     if (claimed.count === 0) return;
     const job = await this.prisma.listingPublicationJob.findUniqueOrThrow({ where: { id: jobId } });
 
     if (!(await this.settings.get('controls.publishing_enabled'))) {
-      // Emergency stop: put the job back untouched; nothing is sent to the marketplace.
       await this.prisma.listingPublicationJob.update({ where: { id: jobId }, data: { status: 'QUEUED', attempts: { decrement: 1 }, nextAttemptAt: new Date() } });
       await this.prisma.marketplaceListing.update({ where: { id: job.listingId }, data: { lastError: 'Waiting: publishing is paused by an emergency control.' } });
       return;
     }
+    const listing = await this.prisma.marketplaceListing.findUniqueOrThrow({ where: { id: job.listingId } });
 
-    const listing = await this.prisma.marketplaceListing.findUniqueOrThrow({
-      where: { id: job.listingId },
-      include: { account: { include: { credential: true } }, product: { select: { images: true } } },
-    });
-    const version = await this.prisma.listingVersion.findUniqueOrThrow({ where: { id: job.versionId } });
-    const content = ListingContent.parse(version.content);
-    const started = Date.now();
+    if (job.operation === 'CONFIRM') return this.confirm(job, listing.externalListingId!, listing.sku);
 
-    let result: ConnectorResult<{ externalListingId?: string; externalOfferId?: string; status: string }>;
-    try {
-      const connector = this.registry.forAccount({ marketplace: listing.marketplace as MarketplaceCode, environment: listing.account.environment });
-      const cred = listing.account.credential;
-      const ctx = {
-        accountId: listing.accountId,
-        environment: listing.account.environment,
-        credentials: cred ? (JSON.parse(this.crypto.decrypt(cred)) as Record<string, unknown>) : null,
-        idempotencyKey: job.idempotencyKey,
-      };
-      const imagesById = new Map(listing.product.images.map((i) => [i.id, i]));
-      const payload: PublishPayload = {
-        listingId: listing.id,
-        sku: listing.sku,
-        price: listing.price!.toString(),
-        currency: listing.currency,
-        quantity: content.quantityPolicy === 'FIXED' ? content.fixedQuantity ?? 0 : listing.quantity,
-        content,
-        images: content.imageIds.flatMap((id, i) => (imagesById.has(id) ? [{ url: imagesById.get(id)!.url, isMain: i === 0 }] : [])),
-        externalListingId: listing.externalListingId,
-        externalOfferId: listing.externalOfferId,
-      };
-      if (job.operation === 'CREATE') result = await connector.createListing(ctx, payload);
-      else if (job.operation === 'REVISE') result = await connector.reviseListing(ctx, payload);
-      else {
-        const state = job.operation === 'PAUSE' ? 'PAUSED' : job.operation === 'END' ? 'ENDED' : 'ACTIVE';
-        result = await connector.setListingState(ctx, { externalListingId: listing.externalListingId!, state });
-      }
-    } catch (e) {
-      result = { ok: false, transient: true, code: 'CONNECTOR_EXCEPTION', message: (e as Error).message, readable: 'The marketplace connection failed unexpectedly. The operation will be retried.' };
-    }
-
-    const failedPermanently = !result.ok && (!result.transient || job.attempts >= job.maxAttempts);
-    await this.prisma.marketplaceOperation.create({
-      data: {
-        accountId: listing.accountId,
-        operation: job.operation,
-        entityType: 'listing',
-        entityId: listing.id,
-        jobId: job.id,
-        status: result.ok ? 'SUCCEEDED' : result.code === 'CONNECTOR_NOT_IMPLEMENTED' ? 'UNSUPPORTED' : result.transient ? 'FAILED_TRANSIENT' : 'FAILED_PERMANENT',
-        errorCode: result.ok ? null : result.code,
-        errorMessage: result.ok ? null : result.message,
-        readableError: result.ok ? null : result.readable,
-        retryCount: job.attempts - 1,
-        nextAction: result.ok ? null : failedPermanently ? result.nextAction ?? 'Fix the listing and retry, or revise it.' : 'Automatic retry scheduled',
-        httpStatus: result.ok ? null : result.httpStatus,
-        durationMs: Date.now() - started,
-      },
-    });
-
-    if (result.ok) {
-      await this.prisma.$transaction(async (tx) => {
-        await tx.listingPublicationJob.update({ where: { id: jobId }, data: { status: 'SUCCEEDED', nextAttemptAt: null } });
-        if (job.operation === 'CREATE' || job.operation === 'REVISE') {
-          await this.listings.applyEvent(listing.id, 'MARKETPLACE_CONFIRMED', null, {}, `Confirmed by marketplace`, tx, {
-            externalListingId: result.data.externalListingId ?? listing.externalListingId,
-            externalOfferId: result.data.externalOfferId ?? listing.externalOfferId,
-            publishedVersionId: job.versionId,
-            lastPublishedAt: new Date(),
-            lastError: null,
-            autoPaused: false,
-          });
-        } else {
-          const event = job.operation === 'PAUSE' ? 'PAUSE' : job.operation === 'END' ? 'END' : 'RESUME';
-          await this.listings.applyEvent(listing.id, event, null, {}, 'Confirmed by marketplace', tx, { lastError: null });
+    const result = await this.accounts.run<unknown>(
+      job.accountId,
+      job.operation,
+      { type: 'listing', id: listing.id, jobId: job.id, retryCount: job.attempts - 1 },
+      async (ctx, connector): Promise<ConnectorResult<unknown>> => {
+        switch (job.operation) {
+          case 'CREATE':
+            return connector.createListing(ctx, await this.payload(listing.id, job.versionId));
+          case 'REVISE':
+            return connector.reviseListing(ctx, await this.payload(listing.id, job.versionId));
+          case 'UPDATE_PRICE_QUANTITY': {
+            const pl = (job.payload ?? {}) as { price?: string; quantity?: number };
+            return connector.updatePriceQuantity(ctx, { externalListingId: listing.externalListingId!, externalOfferId: listing.externalOfferId, sku: listing.sku, currency: listing.currency, ...pl });
+          }
+          default: {
+            const state = job.operation === 'PAUSE' ? 'PAUSED' : job.operation === 'END' ? 'ENDED' : 'ACTIVE';
+            return connector.setListingState(ctx, { externalListingId: listing.externalListingId!, externalOfferId: listing.externalOfferId, sku: listing.sku, state, quantity: listing.quantity || 1 });
+          }
         }
-      });
-      return;
-    }
+      },
+      job.idempotencyKey,
+    );
 
-    if (!failedPermanently) {
+    if (result.ok) return this.onSuccess(job, result.data as Record<string, any>);
+    const permanent = !result.transient || job.attempts >= job.maxAttempts;
+    if (!permanent) {
       const delay = backoffMs(job.attempts);
-      await this.prisma.listingPublicationJob.update({ where: { id: jobId }, data: { status: 'QUEUED', nextAttemptAt: new Date(Date.now() + delay) } });
+      await this.prisma.listingPublicationJob.update({ where: { id: jobId }, data: { status: 'QUEUED', nextAttemptAt: new Date(Date.now() + delay), lastError: result.readable } });
       await this.prisma.marketplaceListing.update({ where: { id: listing.id }, data: { lastError: `${result.readable} (attempt ${job.attempts} of ${job.maxAttempts})` } });
       await this.dispatch({ id: jobId, attempts: job.attempts }, delay);
       return;
     }
+    await this.fail(job, result.readable);
+  }
 
+  private async onSuccess(job: ListingPublicationJob, data: Record<string, any>) {
     await this.prisma.$transaction(async (tx) => {
-      await tx.listingPublicationJob.update({ where: { id: jobId }, data: { status: 'FAILED', nextAttemptAt: null } });
+      await tx.listingPublicationJob.update({ where: { id: job.id }, data: { status: 'SUCCEEDED', nextAttemptAt: null, lastError: null } });
       if (job.operation === 'CREATE' || job.operation === 'REVISE') {
-        await this.listings.applyEvent(listing.id, 'MARKETPLACE_FAILED', null, {}, result.ok ? undefined : result.readable, tx, { lastError: result.ok ? null : result.readable });
+        const listing = await tx.marketplaceListing.findUniqueOrThrow({ where: { id: job.listingId } });
+        if (data.status === 'PENDING') {
+          // Accepted but under marketplace review: remember the ids, keep PUBLISHING, poll for the outcome.
+          await tx.marketplaceListing.update({
+            where: { id: job.listingId },
+            data: { externalListingId: data.externalListingId ?? listing.externalListingId, externalOfferId: data.externalOfferId || listing.externalOfferId, lastError: 'Submitted — waiting for the marketplace to approve the listing.' },
+          });
+          await tx.listingPublicationJob.upsert({
+            where: { idempotencyKey: `${job.listingId}:${job.versionId}:CONFIRM` },
+            update: { status: 'QUEUED', attempts: 0, nextAttemptAt: new Date(Date.now() + CONFIRM_DELAY_MS) },
+            create: {
+              listingId: job.listingId, versionId: job.versionId, accountId: job.accountId, operation: 'CONFIRM', maxAttempts: CONFIRM_MAX_CHECKS,
+              idempotencyKey: `${job.listingId}:${job.versionId}:CONFIRM`, nextAttemptAt: new Date(Date.now() + CONFIRM_DELAY_MS), batchId: job.batchId,
+            },
+          });
+          return;
+        }
+        await this.listings.applyEvent(job.listingId, 'MARKETPLACE_CONFIRMED', null, {}, 'Confirmed by marketplace', tx, {
+          externalListingId: data.externalListingId ?? listing.externalListingId,
+          externalOfferId: data.externalOfferId ?? listing.externalOfferId,
+          publishedVersionId: job.versionId,
+          lastPublishedAt: new Date(),
+          lastError: null,
+          autoPaused: false,
+        });
+      } else if (job.operation === 'UPDATE_PRICE_QUANTITY') {
+        const pl = (job.payload ?? {}) as { price?: string; quantity?: number };
+        await tx.marketplaceListing.update({ where: { id: job.listingId }, data: { price: pl.price ?? undefined, quantity: pl.quantity ?? undefined, lastError: null } });
       } else {
-        await tx.marketplaceListing.update({ where: { id: listing.id }, data: { lastError: result.ok ? null : result.readable } });
+        const event = job.operation === 'PAUSE' ? 'PAUSE' : job.operation === 'END' ? 'END' : 'RESUME';
+        const pl = (job.payload ?? {}) as { auto?: boolean };
+        await this.listings.applyEvent(job.listingId, event, null, {}, pl.auto ? 'Automatic (stock)' : 'Confirmed by marketplace', tx, { lastError: null, autoPaused: event === 'PAUSE' ? !!pl.auto : false });
+      }
+    });
+  }
+
+  private async confirm(job: ListingPublicationJob, externalListingId: string, sku: string) {
+    const r = await this.accounts.run(job.accountId, 'GET_LISTING_STATUS', { type: 'listing', id: job.listingId, jobId: job.id }, (ctx, c) => c.getListingStatus(ctx, { externalListingId, sku }));
+    const requeue = async (msg: string) => {
+      await this.prisma.listingPublicationJob.update({ where: { id: job.id }, data: { status: 'QUEUED', nextAttemptAt: new Date(Date.now() + CONFIRM_DELAY_MS), lastError: msg } });
+      await this.dispatch(job, CONFIRM_DELAY_MS);
+    };
+    if (!r.ok) {
+      if (r.transient && job.attempts < job.maxAttempts) return requeue(r.readable);
+      return this.fail(job, r.readable);
+    }
+    if (r.data.state === 'ACTIVE' || r.data.state === 'PAUSED') {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.listingPublicationJob.update({ where: { id: job.id }, data: { status: 'SUCCEEDED', nextAttemptAt: null } });
+        await this.listings.applyEvent(job.listingId, 'MARKETPLACE_CONFIRMED', null, {}, 'Approved and live on the marketplace', tx, {
+          publishedVersionId: job.versionId,
+          lastPublishedAt: new Date(),
+          lastError: null,
+        });
+      });
+      return;
+    }
+    if (r.data.state === 'FAILED') return this.fail(job, `The marketplace did not approve the listing: ${r.data.reason ?? 'no reason given'}`);
+    if (job.attempts >= job.maxAttempts) return this.fail(job, 'The marketplace has not approved the listing after 25 hours. Check it in the seller centre, then retry.');
+    return requeue(r.data.reason ?? 'Still under marketplace review');
+  }
+
+  private async fail(job: ListingPublicationJob, readable: string) {
+    const listing = await this.prisma.marketplaceListing.findUniqueOrThrow({ where: { id: job.listingId } });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.listingPublicationJob.update({ where: { id: job.id }, data: { status: 'FAILED', nextAttemptAt: null, lastError: readable } });
+      if (['CREATE', 'REVISE', 'CONFIRM'].includes(job.operation) && listing.status === 'PUBLISHING') {
+        await this.listings.applyEvent(listing.id, 'MARKETPLACE_FAILED', null, {}, readable, tx, { lastError: readable });
+      } else {
+        await tx.marketplaceListing.update({ where: { id: listing.id }, data: { lastError: readable } });
       }
       await this.notifications.notify(
-        { type: 'LISTING_PUBLICATION_FAILED', severity: 'warning', title: `${job.operation} failed for ${listing.sku}`, body: result.ok ? '' : result.readable, entityType: 'listing', entityId: listing.id, roleKey: 'owner' },
+        { type: 'LISTING_PUBLICATION_FAILED', severity: 'warning', title: `${job.operation.toLowerCase().replace(/_/g, ' ')} failed for ${listing.sku}`, body: readable, entityType: 'listing', entityId: listing.id, roleKey: 'owner' },
         tx,
       );
     });
-    this.logger.warn(`Publication job ${jobId} failed: ${result.ok ? '' : result.code}`);
+    this.logger.warn(`Publication job ${job.id} (${job.operation}) failed: ${readable}`);
   }
 }

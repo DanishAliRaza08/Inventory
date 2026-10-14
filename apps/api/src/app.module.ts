@@ -21,13 +21,21 @@ import { ImportsController } from './imports/imports.controller';
 import { ImportsService } from './imports/imports.service';
 import { AccountsController } from './integrations/accounts.controller';
 import { ConnectorRegistry } from './integrations/connector-registry';
+import { AccountContextService } from './integrations/account-context.service';
+import { ImageUrlService } from './storage/image-url.service';
 import { InventoryController } from './inventory/inventory.controller';
 import { InventoryService } from './inventory/inventory.service';
 import { ListingsController } from './listings/listings.controller';
 import { ListingsService } from './listings/listings.service';
 import { PublicationService } from './listings/publication.service';
+import { RepricingService } from './listings/repricing.service';
 import { NotificationsController, NotificationsService } from './notifications/notifications.service';
 import { PrismaModule } from './prisma/prisma.module';
+import { OrdersController } from './orders/orders.controller';
+import { OrdersService } from './orders/orders.service';
+import { SyncService } from './integrations/sync.service';
+import { InventorySyncService } from './inventory/inventory-sync.service';
+import { SupplierSyncService } from './suppliers/supplier-sync.service';
 import { CustomerPiiController, CustomerPiiService } from './privacy/customer-pii.service';
 import { ImagesController } from './products/images.controller';
 import { ProductsController } from './products/products.controller';
@@ -51,12 +59,12 @@ import { UsersService } from './users/users.service';
   controllers: [
     HealthController, AuthController, UsersController, AuditController, SettingsController, NotificationsController,
     ProductsController, ImagesController, SuppliersController, CostsController, InventoryController,
-    FinanceController, ListingsController, AccountsController, ImportsController, DashboardController, CustomerPiiController,
+    FinanceController, ListingsController, AccountsController, ImportsController, DashboardController, CustomerPiiController, OrdersController,
   ],
   providers: [
     CryptoService, AuditService, AuthService, SettingsService, NotificationsService, UsersService, StorageService,
     ProductsService, SuppliersService, CostsService, InventoryService, ProfitService,
-    ListingsService, PublicationService, ConnectorRegistry, ImportsService, DashboardService, CustomerPiiService,
+    ListingsService, PublicationService, RepricingService, ConnectorRegistry, AccountContextService, ImageUrlService, ImportsService, DashboardService, CustomerPiiService, OrdersService, SyncService, InventorySyncService, SupplierSyncService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_INTERCEPTOR, useClass: SerializeInterceptor },

@@ -27,6 +27,10 @@ export const ListingContent = z.object({
   searchKeywords: z.array(z.string().max(100)).max(50).default([]),
   handlingInstructions: z.string().max(2000).nullable().default(null),
   notes: z.string().max(5000).nullable().default(null),
+  /** eBay payment business policy (falls back to the account default). */
+  paymentPolicyId: z.string().max(100).nullable().default(null),
+  /** Amazon product type (e.g. DRESS, SHIRT), drives the attribute schema. */
+  productType: z.string().max(60).nullable().default(null),
   /** Set only by users with listings.approve. */
   complianceSignedOff: z.boolean().default(false),
 });
