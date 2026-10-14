@@ -7,11 +7,12 @@ at `GET /api/integrations/capabilities`.
 ## 4.1 Ground rules
 
 * **Official APIs only.** No browser automation, scraping or unofficial endpoints.
-* **Verify before building.** Each operation below is mapped to the official API that documents
-  it. Before an operation is switched from `planned` to `implemented` it must be verified for
-  Fashion Rockstar's account, region and approval status, and tested against the sandbox (where
-  the marketplace offers one) and then production with a low-risk listing.
-* **Honest status.** An operation that is not yet implemented returns
+* **Verify before trusting.** Each operation below is mapped to the official API that documents
+  it. Operations are **built** when implemented and tested against the mock marketplace server
+  (`apps/api/src/mock`, which reproduces each API's request format, signatures and responses);
+  they become **verified** after a successful run against Fashion Rockstar's real account —
+  sandbox first where the marketplace offers one, then production with a low-risk listing.
+* **Honest status.** An operation that is not implemented returns
   `CONNECTOR_NOT_IMPLEMENTED` with a readable explanation. An operation without an API is
   labelled `manual`. Nothing is shown as published unless the marketplace confirmed it.
 * **Demo mode is separate.** The `DemoConnector` only runs when `DEMO_MODE=true` (refused in
@@ -21,8 +22,15 @@ at `GET /api/integrations/capabilities`.
   sent to the browser. Token refresh runs before expiry; an expired or revoked grant sets the
   account to `EXPIRED` and shows a **Reconnect** action.
 
-Status legend: **I** implemented · **P** planned (official API exists) · **M** manual · **U** unsupported.
-Current status for every row: **P**, connector work begins in Phase 3.
+Status legend: **V** verified against the live marketplace · **B** built (tested against the mock
+marketplace; awaiting real credentials) · **M** manual · **U** unsupported.
+Current status for every row below: **B**. Tests: `apps/api/test/connectors.test.ts`.
+
+**Mock mode.** `MOCK_MARKETPLACES=true` (refused in production) points every connector at the mock
+server (`pnpm --filter @fr/api mock`, default `:4100`) and fills in dummy app credentials, so the
+whole OAuth → publish → orders → tracking → fees → settlement flow runs end-to-end with dummy
+data. The mock checks TikTok and AliExpress request signatures and keeps state in memory
+(`POST /mock/reset`, `POST /mock/:marketplace/orders` to generate orders, `GET /mock/state`).
 
 ## 4.2 eBay UK (`EBAY_GB`) and eBay USA (`EBAY_US`)
 
@@ -120,8 +128,8 @@ Code: `apps/api/src/integrations/supplier-connectors.ts` (capabilities shown on 
 
 | Supplier | Integration | Use |
 |---|---|---|
-| AliExpress | **Official AliExpress Open Platform dropshipping (DS) APIs** (decision October 2026): product/SKU query (price, stock, ship-from warehouse), order create, order and logistics tracking. Signed requests with the app key/secret, seller authorisation | Phase 4. Needs the approved app's key and secret (stored encrypted, never in the repository). Until approved, AliExpress stays manual: price/stock checks recorded with source and time |
-| CJ Dropshipping | Official CJ API (product, variant inventory per warehouse, create order, tracking) | Phase 4 |
+| AliExpress | **Official AliExpress Open Platform dropshipping (DS) APIs** (decision October 2026): `aliexpress.ds.product.get` (price, stock, ship-from), `aliexpress.ds.order.create`, `aliexpress.ds.order.tracking.get`. HMAC-SHA256 signed requests, seller OAuth (`/api/integrations/oauth/aliexpress/callback`) | **B**. Needs the approved app's key and secret (`ALIEXPRESS_APP_KEY/SECRET`). Without them AliExpress stays manual: price/stock checks recorded with source and time |
+| CJ Dropshipping | Official CJ API v2 (`CJ-Access-Token` from the API key): product/variant query, inventory per warehouse, `createOrderV2`, tracking | **B**. Needs `CJ_API_KEY` |
 | Others | CSV/XLSX price & stock files, manual entry | now |
 
 Supplier orders are **never placed automatically**: a staff member confirms each one. Supplier-

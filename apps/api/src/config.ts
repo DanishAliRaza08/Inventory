@@ -50,9 +50,6 @@ const EnvSchema = z.object({
   AMAZON_LWA_CLIENT_ID: z.string().default(''),
   AMAZON_LWA_CLIENT_SECRET: z.string().default(''),
   AMAZON_SP_APP_ID: z.string().default(''),
-  /** Optional: self-authorised refresh token (private app) instead of the consent flow. */
-  AMAZON_REFRESH_TOKEN: z.string().default(''),
-  AMAZON_SELLER_ID: z.string().default(''),
 
   // ── TikTok Shop ──
   TIKTOK_APP_KEY: z.string().default(''),

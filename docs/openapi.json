@@ -1359,6 +1359,45 @@
         ]
       }
     },
+    "/api/public/images/{imageId}": {
+      "get": {
+        "operationId": "ImagesController_publicFile",
+        "parameters": [
+          {
+            "name": "imageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "exp",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sig",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Products & inventory"
+        ]
+      }
+    },
     "/api/products/{id}/images": {
       "post": {
         "operationId": "ImagesController_upload",
@@ -2151,6 +2190,7 @@
                       "RESERVE",
                       "RELEASE",
                       "COMMIT",
+                      "UNCOMMIT",
                       "SHIP",
                       "RETURN",
                       "RESTOCK",
@@ -2404,7 +2444,7 @@
                   "asOf": {
                     "type": "string",
                     "format": "date-time",
-                    "default": "2026-10-14T14:26:55.666Z"
+                    "default": "2026-10-14T19:33:38.272Z"
                   },
                   "source": {
                     "type": "string",
@@ -2573,7 +2613,7 @@
                   "effectiveFrom": {
                     "type": "string",
                     "format": "date-time",
-                    "default": "2026-10-14T14:26:55.667Z"
+                    "default": "2026-10-14T19:33:38.274Z"
                   },
                   "effectiveTo": {
                     "type": "string",
@@ -3278,6 +3318,66 @@
         ]
       }
     },
+    "/api/listings/repricing/proposals": {
+      "get": {
+        "operationId": "ListingsController_proposals",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/{id}/reprice": {
+      "post": {
+        "operationId": "ListingsController_reprice",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/{id}/category-attributes": {
+      "post": {
+        "operationId": "ListingsController_categoryAttributes",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
     "/api/listings": {
       "get": {
         "operationId": "ListingsController_list",
@@ -3529,6 +3629,18 @@
                         "nullable": true,
                         "default": null
                       },
+                      "paymentPolicyId": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "productType": {
+                        "type": "string",
+                        "maxLength": 60,
+                        "nullable": true,
+                        "default": null
+                      },
                       "complianceSignedOff": {
                         "type": "boolean",
                         "default": false
@@ -3762,6 +3874,18 @@
                         "nullable": true,
                         "default": null
                       },
+                      "paymentPolicyId": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "productType": {
+                        "type": "string",
+                        "maxLength": 60,
+                        "nullable": true,
+                        "default": null
+                      },
                       "complianceSignedOff": {
                         "type": "boolean",
                         "default": false
@@ -3985,6 +4109,18 @@
                       "notes": {
                         "type": "string",
                         "maxLength": 5000,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "paymentPolicyId": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "productType": {
+                        "type": "string",
+                        "maxLength": 60,
                         "nullable": true,
                         "default": null
                       },
@@ -4536,7 +4672,7 @@
     },
     "/api/integrations/accounts": {
       "get": {
-        "operationId": "AccountsController_accounts",
+        "operationId": "AccountsController_list",
         "parameters": [],
         "responses": {
           "200": {
@@ -4600,10 +4736,368 @@
         ]
       }
     },
+    "/api/integrations/accounts/{id}/settings": {
+      "patch": {
+        "operationId": "AccountsController_settings",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "postcode": {
+                    "type": "string",
+                    "maxLength": 20
+                  },
+                  "country": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 2
+                  },
+                  "location": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "paymentPolicyId": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "warehouseId": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "defaultProductType": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "shippingProviderIds": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "sellerId": {
+                    "type": "string",
+                    "maxLength": 40
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/api/integrations/accounts/{id}/connect": {
+      "get": {
+        "operationId": "AccountsController_connect",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/api/integrations/oauth/{provider}/callback": {
+      "get": {
+        "operationId": "AccountsController_callback",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/api/integrations/accounts/{id}/credentials": {
+      "post": {
+        "operationId": "AccountsController_manualCredentials",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refreshToken": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 2000
+                  },
+                  "sellerId": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 40
+                  }
+                },
+                "required": [
+                  "refreshToken",
+                  "sellerId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/api/integrations/accounts/{id}/disconnect": {
+      "post": {
+        "operationId": "AccountsController_disconnect",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/api/integrations/accounts/{id}/test": {
+      "post": {
+        "operationId": "AccountsController_test",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/api/integrations/accounts/{id}/sync/{resource}": {
+      "post": {
+        "operationId": "AccountsController_syncNow",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resource",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/api/integrations/accounts/{id}/adopt-listings": {
+      "post": {
+        "operationId": "AccountsController_adopt",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/api/integrations/operations": {
+      "get": {
+        "operationId": "AccountsController_operations",
+        "parameters": [
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
     "/api/integrations/capabilities": {
       "get": {
         "operationId": "AccountsController_capabilities",
         "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/api/integrations/suppliers/{id}/connect": {
+      "get": {
+        "operationId": "AccountsController_supplierConnect",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/api/integrations/suppliers/sync": {
+      "post": {
+        "operationId": "AccountsController_syncSuppliers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/api/integrations/supplier-products/{id}/sync": {
+      "post": {
+        "operationId": "AccountsController_syncSupplierProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -4901,6 +5395,685 @@
         },
         "tags": [
           "Orders"
+        ]
+      }
+    },
+    "/api/orders": {
+      "get": {
+        "operationId": "OrdersController_list",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "marketplace",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "supplierId",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "sku",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          },
+          {
+            "name": "dueWithinHours",
+            "required": false,
+            "in": "query",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/orders/{id}": {
+      "get": {
+        "operationId": "OrdersController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/orders/{id}/shipments": {
+      "post": {
+        "operationId": "OrdersController_ship",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "carrier": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "trackingNumber": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 80
+                  },
+                  "shippedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "labelCost": {
+                    "allOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d{1,4})?$"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "carrier",
+                  "trackingNumber"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/orders/{id}/delivered": {
+      "post": {
+        "operationId": "OrdersController_delivered",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/orders/{id}/supplier-order": {
+      "post": {
+        "operationId": "OrdersController_placeSupplierOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/orders/{id}/supplier-order/manual": {
+      "post": {
+        "operationId": "OrdersController_manualSupplierOrder",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/orders/{id}/refunds": {
+      "post": {
+        "operationId": "OrdersController_refund",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/orders/{id}/returns": {
+      "post": {
+        "operationId": "OrdersController_createReturn",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/returns/{id}/receive": {
+      "post": {
+        "operationId": "OrdersController_receive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/returns": {
+      "get": {
+        "operationId": "OrdersController_returns",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/refunds": {
+      "get": {
+        "operationId": "OrdersController_refunds",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/orders/{id}/recalculate": {
+      "post": {
+        "operationId": "OrdersController_recalc",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/automation/kinds": {
+      "get": {
+        "operationId": "AutomationController_kinds",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Automation"
+        ]
+      }
+    },
+    "/api/automation/rules": {
+      "get": {
+        "operationId": "AutomationController_rules",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Automation"
+        ]
+      },
+      "post": {
+        "operationId": "AutomationController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "LOW_PROFIT_LISTINGS",
+                      "SUPPLIER_OUT_OF_STOCK",
+                      "SUPPLIER_COST_INCREASE",
+                      "DISPATCH_DEADLINE",
+                      "DRAFTS_AWAITING_APPROVAL",
+                      "PUBLICATION_FAILURES",
+                      "STALE_SUPPLIER_DATA",
+                      "DAILY_SALES_REPORT"
+                    ]
+                  },
+                  "conditions": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "default": {}
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "NOTIFY",
+                      "PROPOSE_REPRICE",
+                      "PAUSE_LISTINGS"
+                    ]
+                  },
+                  "notifyRole": {
+                    "type": "string",
+                    "default": "owner"
+                  },
+                  "everyMinutes": {
+                    "type": "integer",
+                    "minimum": 15,
+                    "maximum": 10080,
+                    "default": 60
+                  },
+                  "enabled": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "requiresApproval": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "name",
+                  "kind",
+                  "action"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Automation"
+        ]
+      }
+    },
+    "/api/automation/rules/{id}": {
+      "put": {
+        "operationId": "AutomationController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Automation"
+        ]
+      }
+    },
+    "/api/automation/rules/{id}/run": {
+      "post": {
+        "operationId": "AutomationController_run",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Automation"
+        ]
+      }
+    },
+    "/api/reports": {
+      "get": {
+        "operationId": "ReportsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/reports/{key}": {
+      "get": {
+        "operationId": "ReportsController_run",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/reports/{key}/export": {
+      "get": {
+        "operationId": "ReportsController_export",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Reports"
+        ]
+      }
+    },
+    "/api/ai/status": {
+      "get": {
+        "operationId": "AiController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "AI assistant"
+        ]
+      }
+    },
+    "/api/ai/listings/{id}/suggest": {
+      "post": {
+        "operationId": "AiController_suggestListing",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "instructions": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "AI assistant"
+        ]
+      }
+    },
+    "/api/ai/orders/{id}/reply": {
+      "post": {
+        "operationId": "AiController_suggestReply",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 5000
+                  }
+                },
+                "required": [
+                  "message"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "AI assistant"
         ]
       }
     }

@@ -9,6 +9,7 @@
 | Storage | local disk (`UPLOAD_DIR`) | S3-compatible bucket | S3-compatible bucket, versioning on |
 | Marketplace apps | none / DEMO | **sandbox** apps & accounts | production apps |
 | `DEMO_MODE` | allowed | allowed only on a separate demo stack | **refused at boot** |
+| `MOCK_MARKETPLACES` | allowed (mock server on `:4100`) | not used — sandbox apps instead | **refused at boot** |
 | MFA for privileged roles | optional | enforced | enforced (`MFA_ENFORCE_FOR_PRIVILEGED=true`) |
 
 ## Local setup
@@ -28,6 +29,36 @@ pnpm dev:web                                  # http://localhost:3000
 
 Full stack in containers: `APP_ENCRYPTION_KEY=$(openssl rand -base64 32) docker compose up --build`.
 
+### Dummy data and mock marketplaces
+
+* `DEMO_MODE=true` + `pnpm --filter @fr/api demo` fills an empty database with a DEMO business:
+  ~25 products / 150 SKUs, listings on the four DEMO accounts and ~90 days of orders pushed
+  through the real ingestion, dispatch and reconciliation code (fees, payouts, refunds, returns,
+  expenses, automation rules). `DEMO_DAYS` and `DEMO_ORDERS_PER_DAY` adjust the volume.
+* `MOCK_MARKETPLACES=true` + `pnpm --filter @fr/api mock` runs the mock eBay / Amazon / TikTok /
+  AliExpress / CJ APIs. Every real connector then talks to it, so **Connect**, publishing, order
+  sync, tracking and finance sync can be tried on the non-demo accounts with dummy data.
+
+## Background worker
+
+`pnpm --filter @fr/api worker` (production: same image, command `node dist/src/worker.js`) runs the
+queue consumers and this schedule (each task never overlaps itself; failures are logged and
+retried on the next tick):
+
+| Task | Every | Setting |
+|---|---|---|
+| Publication sweep (queued publish / confirm / price-quantity jobs) | 1 min | — |
+| Order sync, all connected accounts | 10 min | `SYNC_ORDERS_EVERY_MIN` |
+| Fees, refunds and payouts sync | 60 min | `SYNC_FINANCE_EVERY_MIN` |
+| Stock push to marketplaces | 15 min (plus immediately on stock changes) | `SYNC_INVENTORY_EVERY_MIN` |
+| Supplier price and stock sync (AliExpress, CJ) | 6 h | `SYNC_SUPPLIERS_EVERY_MIN` |
+| Supplier tracking poll | 30 min | — |
+| Automation rules due to run | 5 min | per rule |
+| Customer data retention purge | 60 min | Settings → privacy |
+
+Emergency controls (Settings) stop publishing, repricing, inventory sync or automation without
+stopping the worker. Setting an interval to `0` disables that task.
+
 ## Release procedure
 
 1. CI green on the commit (typecheck, unit, integration, web build, e2e).
@@ -46,6 +77,10 @@ Full stack in containers: `APP_ENCRYPTION_KEY=$(openssl rand -base64 32) docker 
 `APP_ENCRYPTION_KEY` (32 bytes, base64), database and Redis URLs, marketplace client ids/secrets,
 S3 credentials and error-tracking DSNs come from the platform's secret manager — never from the
 repository. Marketplace user tokens are stored encrypted in `integration_credentials`.
+The full list of variables, where each comes from and the callback URLs to register is in the
+[README → What you need to provide](../README.md#what-you-need-to-provide). `PUBLIC_BASE_URL` must be a public
+HTTPS address: OAuth callbacks land there and marketplaces download listing images from its signed
+`/api/public/images/...` links.
 Key rotation: add the new key as version 2, re-encrypt credentials in a background job, retire v1.
 
 ## Backups & recovery
