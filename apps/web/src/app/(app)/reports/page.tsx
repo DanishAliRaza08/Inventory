@@ -7,7 +7,7 @@ import { MARKETPLACE_NAMES, money, pct } from '@/lib/format';
 import { useCan } from '@/lib/session';
 
 interface Col { key: string; label: string; type?: 'money' | 'percent' | 'number' | 'text' | 'date' }
-interface Report { key: string; title: string; columns: Col[]; currency: string; dataStatus: { label: string; counts: Record<string, number>; total: number }; rows: Array<Record<string, unknown>> }
+interface Report { key: string; title: string; columns: Col[]; currency: string; totalRows: number; truncated: boolean; dataStatus: { label: string; counts: Record<string, number>; total: number }; rows: Array<Record<string, unknown>> }
 
 const PRESETS = [['last7', 'Last 7 days'], ['last30', 'Last 30 days'], ['this_month', 'This month'], ['last_month', 'Last month'], ['this_year', 'This year'], ['custom', 'Custom…']] as const;
 const EXPORTS = [['Products, costs, stock & prices', '/api/exports/products'], ['Marketplace listings & statuses', '/api/exports/listings'], ['Cost history (effective-dated)', '/api/exports/costs']];
@@ -71,6 +71,7 @@ export default function ReportsPage() {
               {data && data.rows.length === 0 && <Empty>No data for this period.</Empty>}
               {isLoading && !data && <Empty>Loading…</Empty>}
             </div>
+            {data?.truncated && <p className="mt-2 text-xs text-ink2">Showing the first {data.rows.length.toLocaleString()} of {data.totalRows.toLocaleString()} rows. Export CSV or XLSX for all rows.</p>}
             {data && <p className="mt-2 text-xs text-muted">Amounts in {data.currency} (reporting currency), converted at the rate stored with each calculation.</p>}
           </Card>
         </div>

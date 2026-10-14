@@ -10,6 +10,8 @@
     "worker": "node dist/src/worker.js",
     "mock": "ts-node --transpile-only src/mock/main-mock.ts",
     "demo": "ts-node --transpile-only src/demo/main-demo.ts",
+    "load:data": "ts-node --transpile-only scripts/load-data.ts",
+    "load:test": "ts-node --transpile-only scripts/load-test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",

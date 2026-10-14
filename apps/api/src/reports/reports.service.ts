@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException, Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Decimal, MarketplaceCode, estimateFees, money } from '@fr/core';
 import { ProfitService } from '../finance/profit.service';
@@ -68,12 +68,16 @@ export class ReportsService {
     return { label, counts, total };
   }
 
-  async run(key: string, f: ReportFilter) {
+  /** `limit` caps rows returned for on-screen display; exports pass no limit and get every row. */
+  async run(key: string, f: ReportFilter, opts: { limit?: number } = {}) {
     const def = Object.hasOwn(REPORTS, key) ? REPORTS[key] : undefined;
     if (!def) throw new NotFoundException({ code: 'UNKNOWN_REPORT', message: `Unknown report ${key}` });
     const currency = await this.settings.get('finance.reporting_currency');
     const L = this.lines(f);
+    const status = this.dataStatus(f); // runs in parallel with the report query
+    status.catch(() => undefined); // awaited below; avoid an unhandled rejection if the report query fails first
     let rows: Array<Record<string, unknown>> = [];
+    let groupTotal: number | null = null;
     switch (key) {
       case 'sales_by_marketplace':
         rows = (await this.prisma.$queryRaw<any[]>`SELECT marketplace, COUNT(DISTINCT order_id)::int AS orders, SUM(quantity)::int AS units, SUM(revenue) AS revenue, SUM(fees) AS fees, SUM(profit) AS profit FROM (${L}) l GROUP BY 1 ORDER BY profit DESC`).map((r) => ({ ...r, revenue: r2(r.revenue), fees: r2(r.fees), profit: r2(r.profit), margin: pct(r.profit, r.revenue) }));
@@ -81,11 +85,15 @@ export class ReportsService {
       case 'profit_by_sku':
       case 'best_sellers':
       case 'loss_making_products': {
-        const raw = await this.prisma.$queryRaw<any[]>`SELECT sku, MAX(title) AS title, SUM(quantity)::int AS units, SUM(revenue) AS revenue, SUM(profit) AS profit FROM (${L}) l GROUP BY sku`;
-        rows = raw.map((r) => ({ ...r, revenue: r2(r.revenue), profit: r2(r.profit), margin: pct(r.profit, r.revenue) }));
-        if (key === 'best_sellers') rows = rows.sort((a, b) => n(b.units) - n(a.units)).slice(0, 100);
-        else if (key === 'loss_making_products') rows = rows.filter((r) => n(r.profit) < 0).sort((a, b) => n(a.profit) - n(b.profit));
-        else rows = rows.sort((a, b) => n(b.profit) - n(a.profit));
+        // Sorted and limited in SQL: a month can hold tens of thousands of SKUs.
+        const having = key === 'loss_making_products' ? Prisma.sql`HAVING SUM(profit) < 0` : Prisma.empty;
+        const order = key === 'best_sellers' ? Prisma.sql`units DESC` : key === 'loss_making_products' ? Prisma.sql`profit ASC` : Prisma.sql`profit DESC`;
+        const cap = key === 'best_sellers' ? 100 : opts.limit;
+        const raw = await this.prisma.$queryRaw<any[]>`
+          SELECT sku, MAX(title) AS title, SUM(quantity)::int AS units, SUM(revenue) AS revenue, SUM(profit) AS profit, COUNT(*) OVER ()::int AS total_rows
+          FROM (${L}) l GROUP BY sku ${having} ORDER BY ${order} ${cap ? Prisma.sql`LIMIT ${cap}` : Prisma.empty}`;
+        groupTotal = key === 'best_sellers' ? raw.length : raw[0]?.total_rows ?? 0;
+        rows = raw.map(({ total_rows: _t, ...r }) => ({ ...r, revenue: r2(r.revenue), profit: r2(r.profit), margin: pct(r.profit, r.revenue) }));
         break;
       }
       case 'profit_by_category':
@@ -182,6 +190,8 @@ export class ReportsService {
         break;
       }
     }
-    return { key, title: def.title, columns: def.columns, currency, period: { from: f.from, to: f.to }, marketplace: f.marketplace ?? null, dataStatus: await this.dataStatus(f), rows };
+    const totalRows = groupTotal ?? rows.length;
+    if (opts.limit && rows.length > opts.limit) rows = rows.slice(0, opts.limit);
+    return { key, title: def.title, columns: def.columns, currency, period: { from: f.from, to: f.to }, marketplace: f.marketplace ?? null, dataStatus: await status, rows, totalRows, truncated: rows.length < totalRows };
   }
 }

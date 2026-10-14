@@ -45,36 +45,39 @@ export class ListingsService {
   // ───────────────────────── Queries ─────────────────────────
 
   async list(q: { status?: ListingStatus; marketplace?: MarketplaceCode; accountId?: string; search?: string; assignedToId?: string; page: number; pageSize: number }) {
-    const where: Prisma.MarketplaceListingWhereInput = {
-      status: q.status ?? { not: 'ARCHIVED' },
-      marketplace: q.marketplace,
-      accountId: q.accountId,
-      assignedToId: q.assignedToId,
-      OR: q.search
-        ? [
-            { sku: { contains: q.search, mode: 'insensitive' } },
-            { externalListingId: q.search },
-            { product: { title: { contains: q.search, mode: 'insensitive' } } },
-            { variant: { sku: { contains: q.search, mode: 'insensitive' } } },
-          ]
-        : undefined,
-    };
-    const [items, total, counts] = await Promise.all([
-      this.prisma.marketplaceListing.findMany({
-        where,
-        orderBy: { updatedAt: 'desc' },
-        skip: (q.page - 1) * q.pageSize,
-        take: q.pageSize,
+    // Filter, sort and page in SQL (indexed search branches), then load only the page's rows.
+    const conds: Prisma.Sql[] = [q.status ? Prisma.sql`l.status = ${q.status}::"ListingStatus"` : Prisma.sql`l.status <> 'ARCHIVED'`];
+    if (q.marketplace) conds.push(Prisma.sql`l.marketplace = ${q.marketplace}::"Marketplace"`);
+    if (q.accountId) conds.push(Prisma.sql`l.account_id = ${q.accountId}::uuid`);
+    if (q.assignedToId) conds.push(Prisma.sql`l.assigned_to_id = ${q.assignedToId}::uuid`);
+    if (q.search) {
+      const like = `%${q.search.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+      conds.push(Prisma.sql`l.id IN (
+        SELECT id FROM marketplace_listings WHERE sku ILIKE ${like}
+        UNION SELECT id FROM marketplace_listings WHERE external_listing_id = ${q.search}
+        UNION SELECT ml.id FROM marketplace_listings ml JOIN products p ON p.id = ml.product_id WHERE p.title ILIKE ${like}
+        UNION SELECT ml.id FROM marketplace_listings ml JOIN product_variants v ON v.id = ml.variant_id WHERE v.sku ILIKE ${like})`);
+    }
+    const where = Prisma.join(conds, ' AND ');
+    const [rows, count, counts] = await Promise.all([
+      this.prisma.$queryRaw<Array<{ id: string }>>`SELECT l.id FROM marketplace_listings l WHERE ${where} ORDER BY l.updated_at DESC, l.id DESC LIMIT ${q.pageSize} OFFSET ${(q.page - 1) * q.pageSize}`,
+      this.prisma.$queryRaw<Array<{ n: number }>>`SELECT COUNT(*)::int AS n FROM marketplace_listings l WHERE ${where}`,
+      this.prisma.marketplaceListing.groupBy({ by: ['status'], _count: true }),
+    ]);
+    const ids = rows.map((r) => r.id);
+    const total = count[0]?.n ?? 0;
+    const pos = new Map(ids.map((id, i) => [id, i]));
+    const items = (
+      await this.prisma.marketplaceListing.findMany({
+        where: { id: { in: ids } },
         include: {
           account: { select: { name: true, environment: true } },
           variant: { select: { sku: true } },
           product: { select: { title: true, productNumber: true } },
           currentVersion: { select: { version: true, content: true, validations: { orderBy: { ranAt: 'desc' }, take: 1, select: { valid: true, blockingCount: true, ranAt: true } } } },
         },
-      }),
-      this.prisma.marketplaceListing.count({ where }),
-      this.prisma.marketplaceListing.groupBy({ by: ['status'], _count: true }),
-    ]);
+      })
+    ).sort((a, b) => pos.get(a.id)! - pos.get(b.id)!);
     return {
       items: items.map(({ currentVersion, ...l }) => ({
         ...l,

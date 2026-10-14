@@ -3,6 +3,8 @@ import { z } from 'zod';
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
   PORT: z.coerce.number().default(4000),
+  /** API processes sharing the port (Node cluster). One per CPU core is typical in production. */
+  API_WORKERS: z.coerce.number().int().min(1).max(64).default(1),
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   /** inline = run background jobs in-process (tests); bullmq = Redis-backed queue. */
@@ -64,6 +66,9 @@ const EnvSchema = z.object({
   // ── AI listing assistant (Claude) ──
   ANTHROPIC_API_KEY: z.string().default(''),
   AI_MODEL: z.string().default('claude-opus-5-5'),
+
+  /** Seconds dashboard and report aggregates are cached in-process (0 disables). */
+  AGGREGATE_CACHE_SECONDS: z.coerce.number().min(0).default(60),
 
   /** Background schedules (minutes). */
   SYNC_ORDERS_EVERY_MIN: z.coerce.number().default(10),

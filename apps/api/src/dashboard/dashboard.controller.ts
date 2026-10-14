@@ -1,3 +1,5 @@
+import { TtlCache } from '../common/ttl-cache';
+import { config } from '../config';
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
@@ -48,6 +50,9 @@ const Q = z
 @ApiTags('Dashboard')
 @Controller('dashboard')
 export class DashboardController {
+  // Month-wide aggregates over every order line: cached briefly so repeated page loads are instant.
+  private readonly cache = new TtlCache<unknown>(config().AGGREGATE_CACHE_SECONDS * 1000);
+
   constructor(private readonly dashboard: DashboardService) {}
 
   private filter(q: z.infer<typeof Q>): DashboardFilter {
@@ -58,12 +63,14 @@ export class DashboardController {
   @RequirePermissions('products.read')
   @ApiZodQuery(Q.innerType())
   async summary(@Query(new ZodPipe(Q)) q: z.infer<typeof Q>, @Query('_') _?: string) {
-    return this.dashboard.summary(this.filter(q));
+    const f = this.filter(q);
+    return this.cache.get(`summary:${JSON.stringify(f)}`, () => this.dashboard.summary(f));
   }
 
   @Get('timeseries')
   @RequirePermissions('finance.read')
   timeseries(@Query(new ZodPipe(Q)) q: z.infer<typeof Q>) {
-    return this.dashboard.timeseries(this.filter(q), q.bucket);
+    const f = this.filter(q);
+    return this.cache.get(`series:${q.bucket}:${JSON.stringify(f)}`, () => this.dashboard.timeseries(f, q.bucket));
   }
 }

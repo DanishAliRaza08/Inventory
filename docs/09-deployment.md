@@ -39,6 +39,15 @@ Full stack in containers: `APP_ENCRYPTION_KEY=$(openssl rand -base64 32) docker 
   AliExpress / CJ APIs. Every real connector then talks to it, so **Connect**, publishing, order
   sync, tracking and finance sync can be tried on the non-demo accounts with dummy data.
 
+## Sizing
+
+* API: set `API_WORKERS` to the number of CPU cores (Node cluster; a crashed process is replaced
+  automatically). 2 vCPU / 2 GB is enough for a 10-person team; the load test (docs/08 §8.6) used 4.
+* PostgreSQL: 2 vCPU / 4 GB for the documented volume (20k products, 100k listings, 100k orders a
+  month); enable `pg_trgm` (the migrations do) and keep autovacuum on.
+* Dashboard and report aggregates are cached per API process for `AGGREGATE_CACHE_SECONDS` (60 s).
+* Before go-live, run `load:data` + `load:test` against a staging copy of the production hardware.
+
 ## Background worker
 
 `pnpm --filter @fr/api worker` (production: same image, command `node dist/src/worker.js`) runs the
@@ -54,6 +63,7 @@ retried on the next tick):
 | Supplier price and stock sync (AliExpress, CJ) | 6 h | `SYNC_SUPPLIERS_EVERY_MIN` |
 | Supplier tracking poll | 30 min | — |
 | Automation rules due to run | 5 min | per rule |
+| AI image checks for new images (only with `ANTHROPIC_API_KEY`) | 30 min | — |
 | Customer data retention purge | 60 min | Settings → privacy |
 
 Emergency controls (Settings) stop publishing, repricing, inventory sync or automation without

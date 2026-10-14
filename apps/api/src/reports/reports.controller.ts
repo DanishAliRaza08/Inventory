@@ -1,3 +1,5 @@
+import { TtlCache } from '../common/ttl-cache';
+import { config } from '../config';
 import { Controller, Get, Param, Query, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
@@ -20,6 +22,8 @@ const Q = z.object({
 @ApiTags('Reports')
 @Controller('reports')
 export class ReportsController {
+  private readonly cache = new TtlCache<unknown>(config().AGGREGATE_CACHE_SECONDS * 1000);
+
   constructor(private readonly reports: ReportsService) {}
 
   @Get()
@@ -31,7 +35,8 @@ export class ReportsController {
   @Get(':key')
   @RequirePermissions('reports.read')
   run(@Param('key') key: string, @Query(new ZodPipe(Q)) q: z.infer<typeof Q>) {
-    return this.reports.run(key, { ...resolveRange(q.preset, q.from, q.to), marketplace: q.marketplace });
+    const f = { ...resolveRange(q.preset, q.from, q.to), marketplace: q.marketplace };
+    return this.cache.get(`${key}:${JSON.stringify(f)}`, () => this.reports.run(key, f, { limit: 1000 }));
   }
 
   @Get(':key/export')

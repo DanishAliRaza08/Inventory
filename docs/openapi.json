@@ -2444,7 +2444,7 @@
                   "asOf": {
                     "type": "string",
                     "format": "date-time",
-                    "default": "2026-10-14T19:33:38.272Z"
+                    "default": "2026-10-14T20:27:54.946Z"
                   },
                   "source": {
                     "type": "string",
@@ -2613,7 +2613,7 @@
                   "effectiveFrom": {
                     "type": "string",
                     "format": "date-time",
-                    "default": "2026-10-14T19:33:38.274Z"
+                    "default": "2026-10-14T20:27:54.947Z"
                   },
                   "effectiveTo": {
                     "type": "string",
@@ -3912,6 +3912,354 @@
         },
         "responses": {
           "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/templates/built-in": {
+      "get": {
+        "operationId": "ListingsController_builtInTemplates",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/templates/{templateId}": {
+      "put": {
+        "operationId": "ListingsController_updateTemplate",
+        "parameters": [
+          {
+            "name": "templateId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "marketplace": {
+                    "type": "string",
+                    "enum": [
+                      "EBAY_UK",
+                      "EBAY_US",
+                      "AMAZON_UK",
+                      "TIKTOK_UK"
+                    ]
+                  },
+                  "titleTemplate": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "descriptionTemplate": {
+                    "type": "string",
+                    "maxLength": 20000
+                  },
+                  "bulletTemplates": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 1000
+                    },
+                    "maxItems": 10,
+                    "default": []
+                  },
+                  "defaults": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "default": ""
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 50000,
+                        "default": ""
+                      },
+                      "bulletPoints": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 1000
+                        },
+                        "maxItems": 10,
+                        "default": []
+                      },
+                      "categoryId": {
+                        "type": "string",
+                        "maxLength": 64,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "categoryName": {
+                        "type": "string",
+                        "maxLength": 300,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "condition": {
+                        "type": "string",
+                        "maxLength": 40,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "attributes": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          ]
+                        },
+                        "default": {}
+                      },
+                      "requiredAttributes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "default": []
+                      },
+                      "verifiedAttributes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "default": []
+                      },
+                      "imageIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "default": []
+                      },
+                      "shippingPolicyId": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "returnPolicyId": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "dispatchTimeDays": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 30,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "quantityPolicy": {
+                        "type": "string",
+                        "enum": [
+                          "SYNC",
+                          "FIXED",
+                          "MANUAL"
+                        ],
+                        "nullable": true,
+                        "default": "SYNC"
+                      },
+                      "fixedQuantity": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "brand": {
+                        "type": "string",
+                        "maxLength": 120,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "gtin": {
+                        "type": "string",
+                        "maxLength": 14,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "identifierExemption": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "searchKeywords": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "maxItems": 50,
+                        "default": []
+                      },
+                      "handlingInstructions": {
+                        "type": "string",
+                        "maxLength": 2000,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "notes": {
+                        "type": "string",
+                        "maxLength": 5000,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "paymentPolicyId": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "productType": {
+                        "type": "string",
+                        "maxLength": 60,
+                        "nullable": true,
+                        "default": null
+                      },
+                      "complianceSignedOff": {
+                        "type": "boolean",
+                        "default": false
+                      }
+                    },
+                    "additionalProperties": false,
+                    "default": {}
+                  },
+                  "isDefault": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "name",
+                  "marketplace",
+                  "titleTemplate",
+                  "descriptionTemplate"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      },
+      "delete": {
+        "operationId": "ListingsController_deleteTemplate",
+        "parameters": [
+          {
+            "name": "templateId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Listings"
+        ]
+      }
+    },
+    "/api/listings/templates/preview": {
+      "post": {
+        "operationId": "ListingsController_previewTemplate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "variantId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "marketplace": {
+                    "type": "string",
+                    "enum": [
+                      "EBAY_UK",
+                      "EBAY_US",
+                      "AMAZON_UK",
+                      "TIKTOK_UK"
+                    ]
+                  },
+                  "titleTemplate": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "descriptionTemplate": {
+                    "type": "string",
+                    "maxLength": 20000
+                  },
+                  "bulletTemplates": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 1000
+                    },
+                    "maxItems": 10,
+                    "default": []
+                  }
+                },
+                "required": [
+                  "variantId",
+                  "marketplace",
+                  "titleTemplate",
+                  "descriptionTemplate"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
             "description": ""
           }
         },
@@ -6023,6 +6371,52 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "AI assistant"
+        ]
+      }
+    },
+    "/api/ai/images/{id}/check": {
+      "post": {
+        "operationId": "AiController_checkImage",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "AI assistant"
+        ]
+      }
+    },
+    "/api/ai/products/{id}/check-images": {
+      "post": {
+        "operationId": "AiController_checkProductImages",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""

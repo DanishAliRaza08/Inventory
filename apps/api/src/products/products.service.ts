@@ -16,65 +16,70 @@ export class ProductsService {
     private readonly audit: AuditService,
   ) {}
 
-  async list(q: z.infer<typeof ListProducts>) {
-    const and: Prisma.ProductWhereInput[] = [];
+  /**
+   * Filters, sorts and pages products in one SQL statement and returns only the page's ids and the
+   * total. Each search branch is an indexed lookup (trigram / b-tree), so this stays fast on large
+   * catalogues where an OR of EXISTS sub-queries (or a long `IN` list) would not.
+   */
+  private async pageIds(q: z.infer<typeof ListProducts>) {
+    const conds: Prisma.Sql[] = [q.status ? Prisma.sql`p.status = ${q.status}::"ProductStatus"` : Prisma.sql`p.status <> 'ARCHIVED'`];
     if (q.search) {
-      const s = q.search;
-      const asNumber = /^(FRP-)?0*(\d+)$/i.exec(s)?.[2];
-      and.push({
-        OR: [
-          { title: { contains: s, mode: 'insensitive' } },
-          { variants: { some: { sku: { contains: s, mode: 'insensitive' } } } },
-          { variants: { some: { barcode: s } } },
-          { variants: { some: { aliases: { some: { alias: { equals: s, mode: 'insensitive' } } } } } },
-          { variants: { some: { supplierProducts: { some: { OR: [{ supplierSku: s }, { supplierProductId: s }] } } } } },
-          ...(asNumber ? [{ productNumber: Number(asNumber) }] : []),
-        ],
-      });
+      const like = `%${q.search.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+      const asNumber = /^(FRP-)?0*(\d+)$/i.exec(q.search)?.[2];
+      conds.push(Prisma.sql`p.id IN (
+        SELECT id FROM products WHERE title ILIKE ${like}
+        UNION SELECT product_id FROM product_variants WHERE sku ILIKE ${like}
+        UNION SELECT product_id FROM product_variants WHERE barcode = ${q.search}
+        UNION SELECT v.product_id FROM sku_aliases a JOIN product_variants v ON v.id = a.variant_id WHERE lower(a.alias) = lower(${q.search})
+        UNION SELECT v.product_id FROM supplier_products sp JOIN product_variants v ON v.id = sp.variant_id WHERE sp.supplier_sku = ${q.search} OR sp.supplier_product_id = ${q.search}
+        UNION SELECT id FROM products WHERE product_number = ${asNumber ? Number(asNumber) : -1})`);
     }
-    if (q.status) and.push({ status: q.status });
-    else and.push({ status: { not: 'ARCHIVED' } });
-    if (q.category) and.push({ category: q.category });
-    if (q.brand) and.push({ brand: q.brand });
-    if (q.fulfilmentModel) and.push({ fulfilmentModel: q.fulfilmentModel });
-    if (q.supplierId) and.push({ variants: { some: { supplierProducts: { some: { supplierId: q.supplierId } } } } });
-    if (q.marketplace) and.push({ listings: { some: { marketplace: q.marketplace, status: { not: 'ARCHIVED' } } } });
-    if (q.unlisted) and.push({ listings: { none: { marketplace: q.unlisted, status: { not: 'ARCHIVED' } } } });
-    if (q.stock === 'out') {
-      and.push({
-        OR: [
-          { fulfilmentModel: 'PHYSICAL', variants: { every: { inventory: { every: { available: 0 } } } } },
-          { fulfilmentModel: 'DROPSHIP', variants: { every: { supplierProducts: { every: { stockStatus: { in: ['OUT_OF_STOCK', 'DISCONTINUED'] } } } } } },
-        ],
-      });
-    } else if (q.stock === 'low') {
-      and.push({ variants: { some: { supplierProducts: { some: { stockStatus: 'LOW_STOCK' } } } } });
-    }
-    const where: Prisma.ProductWhereInput = { AND: and };
-    const orderBy: Prisma.ProductOrderByWithRelationInput =
-      q.sort === 'title' ? { title: 'asc' } : q.sort === 'oldest' ? { createdAt: 'asc' } : q.sort === 'number' ? { productNumber: 'asc' } : { createdAt: 'desc' };
+    if (q.category) conds.push(Prisma.sql`p.category = ${q.category}`);
+    if (q.brand) conds.push(Prisma.sql`p.brand = ${q.brand}`);
+    if (q.fulfilmentModel) conds.push(Prisma.sql`p.fulfilment_model = ${q.fulfilmentModel}::"FulfilmentModel"`);
+    if (q.supplierId) conds.push(Prisma.sql`EXISTS (SELECT 1 FROM product_variants v JOIN supplier_products sp ON sp.variant_id = v.id WHERE v.product_id = p.id AND sp.supplier_id = ${q.supplierId}::uuid)`);
+    if (q.marketplace) conds.push(Prisma.sql`EXISTS (SELECT 1 FROM marketplace_listings l WHERE l.product_id = p.id AND l.marketplace = ${q.marketplace}::"Marketplace" AND l.status <> 'ARCHIVED')`);
+    if (q.unlisted) conds.push(Prisma.sql`NOT EXISTS (SELECT 1 FROM marketplace_listings l WHERE l.product_id = p.id AND l.marketplace = ${q.unlisted}::"Marketplace" AND l.status <> 'ARCHIVED')`);
+    // In stock — physical: available units on any variant; dropship: any variant with a supplier not out
+    // of stock. Built as set operations (hash joins) rather than per-product EXISTS checks.
+    const inStock = Prisma.sql`(
+      SELECT v.product_id FROM inventory_records i JOIN product_variants v ON v.id = i.variant_id JOIN products pp ON pp.id = v.product_id
+      WHERE i.available <> 0 AND pp.fulfilment_model = 'PHYSICAL'
+      UNION
+      SELECT v.product_id FROM supplier_products sp JOIN product_variants v ON v.id = sp.variant_id JOIN products pp ON pp.id = v.product_id
+      WHERE sp.stock_status NOT IN ('OUT_OF_STOCK', 'DISCONTINUED') AND pp.fulfilment_model = 'DROPSHIP')`;
+    if (q.stock === 'out') conds.push(Prisma.sql`p.id NOT IN ${inStock}`);
+    if (q.stock === 'in') conds.push(Prisma.sql`p.id IN ${inStock}`);
+    if (q.stock === 'low') conds.push(Prisma.sql`EXISTS (SELECT 1 FROM product_variants v JOIN supplier_products sp ON sp.variant_id = v.id WHERE v.product_id = p.id AND sp.stock_status = 'LOW_STOCK')`);
+    const where = Prisma.join(conds, ' AND ');
+    const order = q.sort === 'title' ? Prisma.sql`p.title ASC, p.id` : q.sort === 'oldest' ? Prisma.sql`p.created_at ASC, p.id ASC` : q.sort === 'number' ? Prisma.sql`p.product_number ASC` : Prisma.sql`p.created_at DESC, p.id DESC`;
+    // One pass computes both the page and the total (the filter can be expensive, e.g. stock status).
+    const rows = await this.prisma.$queryRaw<Array<{ id: string; total: number }>>`
+      SELECT p.id, COUNT(*) OVER ()::int AS total FROM products p WHERE ${where} ORDER BY ${order} LIMIT ${q.pageSize} OFFSET ${(q.page - 1) * q.pageSize}`;
+    if (rows.length) return { ids: rows.map((r) => r.id), total: rows[0]!.total };
+    const count = await this.prisma.$queryRaw<Array<{ n: number }>>`SELECT COUNT(*)::int AS n FROM products p WHERE ${where}`;
+    return { ids: [], total: count[0]?.n ?? 0 };
+  }
 
-    const [items, total] = await Promise.all([
-      this.prisma.product.findMany({
-        where,
-        orderBy,
-        skip: (q.page - 1) * q.pageSize,
-        take: q.pageSize,
-        include: {
-          images: { where: { isMain: true }, take: 1 },
-          variants: {
-            select: {
-              id: true, sku: true, size: true, colour: true, status: true,
-              inventory: { select: { available: true, reserved: true, committed: true, safetyStock: true } },
-              supplierProducts: { where: { priority: 1 }, select: { stockStatus: true, currentPrice: true, currency: true, supplier: { select: { name: true } } }, take: 1 },
-              costRecords: { where: { effectiveTo: null }, take: 1 },
-            },
+  async list(q: z.infer<typeof ListProducts>) {
+    const { ids, total } = await this.pageIds(q);
+    const items = await this.prisma.product.findMany({
+      where: { id: { in: ids } },
+      include: {
+        images: { where: { isMain: true }, take: 1 },
+        variants: {
+          select: {
+            id: true, sku: true, size: true, colour: true, status: true,
+            inventory: { select: { available: true, reserved: true, committed: true, safetyStock: true } },
+            supplierProducts: { where: { priority: 1 }, select: { stockStatus: true, currentPrice: true, currency: true, supplier: { select: { name: true } } }, take: 1 },
+            costRecords: { where: { effectiveTo: null }, take: 1 },
           },
-          listings: { where: { status: { not: 'ARCHIVED' } }, select: { marketplace: true, status: true } },
         },
-      }),
-      this.prisma.product.count({ where }),
-    ]);
+        listings: { where: { status: { not: 'ARCHIVED' } }, select: { marketplace: true, status: true } },
+      },
+    });
+    const pos = new Map(ids.map((id, i) => [id, i]));
+    items.sort((a, b) => pos.get(a.id)! - pos.get(b.id)!);
     return { items: items.map((p) => ({ ...p, code: productCode(p.productNumber) })), total, page: q.page, pageSize: q.pageSize };
   }
 
@@ -203,18 +208,15 @@ export class ProductsService {
         ? this.prisma.product.findMany({ where: { title: { contains: s, mode: 'insensitive' } }, take: 8, select: { id: true, title: true, productNumber: true, status: true } })
         : [],
       perms.has('products.read')
-        ? this.prisma.productVariant.findMany({
-            where: { OR: [{ sku: { contains: s, mode: 'insensitive' } }, { barcode: s }, { aliases: { some: { alias: { equals: s, mode: 'insensitive' } } } }] },
-            take: 8,
-            select: { id: true, sku: true, productId: true, product: { select: { title: true } } },
-          })
+        ? Promise.all([
+            this.prisma.productVariant.findMany({ where: { OR: [{ sku: { contains: s, mode: 'insensitive' } }, { barcode: s }] }, take: 8, select: { id: true, sku: true, productId: true, product: { select: { title: true } } } }),
+            this.prisma.productVariant.findMany({ where: { aliases: { some: { alias: { equals: s, mode: 'insensitive' } } } }, take: 8, select: { id: true, sku: true, productId: true, product: { select: { title: true } } } }),
+          ]).then(([a, b]) => [...new Map([...a, ...b].map((v) => [v.id, v])).values()].slice(0, 8))
         : [],
       perms.has('listings.read')
-        ? this.prisma.marketplaceListing.findMany({
-            where: { OR: [{ externalListingId: s }, { sku: { equals: s, mode: 'insensitive' } }] },
-            take: 8,
-            select: { id: true, sku: true, marketplace: true, externalListingId: true, status: true },
-          })
+        ? this.prisma.$queryRaw<Array<{ id: string; sku: string; marketplace: string; externalListingId: string | null; status: string }>>`
+            SELECT id, sku, marketplace::text, external_listing_id AS "externalListingId", status::text FROM marketplace_listings
+            WHERE external_listing_id = ${s} OR lower(sku) = lower(${s}) LIMIT 8`
         : [],
       perms.has('orders.read')
         ? this.prisma.order.findMany({

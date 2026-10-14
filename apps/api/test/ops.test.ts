@@ -174,6 +174,23 @@ describe('Listing templates', () => {
   });
 });
 
+describe('Listing list search', () => {
+  it('finds listings by product title, partial SKU and marketplace listing id, with status and paging', async () => {
+    await t.prisma.marketplaceListing.update({ where: { id: listingId }, data: { externalListingId: null } });
+    const ids = async (qs: string) => ((await owner.get(`/api/listings?${qs}`)).body.items as Array<{ id: string }>).map((x) => x.id);
+    expect(await ids('search=satin%20slip')).toContain(listingId);
+    expect(await ids('search=skirt-1')).toContain(listingId);
+    expect(await ids('search=ops_skirt')).not.toContain(listingId); // _ is literal
+    const l = await t.prisma.marketplaceListing.findUniqueOrThrow({ where: { id: listingId } });
+    expect(await ids(`search=OPS-SKIRT-10&status=${l.status}`)).toEqual([listingId]);
+    expect(await ids('search=OPS-SKIRT-10&status=ACTIVE')).toEqual([]);
+    const r = await owner.get('/api/listings?pageSize=1&page=1');
+    expect(r.body.items).toHaveLength(1);
+    expect(r.body.total).toBeGreaterThanOrEqual(1);
+    expect(r.body.statusCounts).toBeTypeOf('object');
+  });
+});
+
 describe('Automation rules', () => {
   it('validates conditions and allowed actions per kind', async () => {
     const bad = await owner.post('/api/automation/rules', { name: 'x', kind: 'DISPATCH_DEADLINE', action: 'PAUSE_LISTINGS' });

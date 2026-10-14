@@ -24,6 +24,33 @@ describe('products & SKUs', () => {
     expect(byCode.body.total).toBe(1);
   });
 
+  it('filters and searches the product list by every identifier and by stock state', async () => {
+    const owner = await t.as('owner');
+    const sup = await owner.post('/api/suppliers', { name: 'Filter Test Supplier', type: 'MANUAL', shipsFromCountry: 'GB' });
+    const drop = await createProduct(owner, { title: 'Filterable 100% Silk Scarf', fulfilmentModel: 'DROPSHIP', variants: [{ sku: 'FLT-SCARF-1', barcode: '4006381333931' }] });
+    const phys = await createProduct(owner, { title: 'Filterable Wool Hat', fulfilmentModel: 'PHYSICAL', variants: [{ sku: 'FLT-HAT-1', initialStock: 0 }] });
+    await owner.post(`/api/variants/${drop.variants[0].id}/suppliers`, { supplierId: sup.body.id, supplierSku: 'SUP-ABC-9', supplierProductId: '998877', currentPrice: '3.00', currency: 'GBP' });
+    await owner.post('/api/variants/sku-aliases', { items: [{ variantId: phys.variants[0].id, type: 'LEGACY', alias: 'OLD-HAT-7' }] });
+    const ids = async (qs: string) => ((await owner.get(`/api/products?${qs}`)).body.items as Array<{ id: string }>).map((x) => x.id);
+    expect(await ids('search=filterable')).toEqual(expect.arrayContaining([drop.id, phys.id])); // title, case-insensitive
+    expect(await ids('search=flt-scarf')).toEqual([drop.id]); // partial SKU
+    expect(await ids('search=4006381333931')).toEqual([drop.id]); // barcode
+    expect(await ids('search=old-hat-7')).toEqual([phys.id]); // alias
+    expect(await ids('search=SUP-ABC-9')).toEqual([drop.id]); // supplier SKU
+    expect(await ids('search=998877')).toEqual([drop.id]); // supplier product id
+    expect(await ids(`search=${encodeURIComponent('100%')}`)).toEqual([drop.id]); // % is literal, not a wildcard
+    expect(await ids('search=Filterable&fulfilmentModel=PHYSICAL')).toEqual([phys.id]);
+    expect(await ids(`search=Filterable&supplierId=${sup.body.id}`)).toEqual([drop.id]);
+    // Physical with 0 units and dropship with an unknown-status supplier: hat is out, scarf is in.
+    expect(await ids('search=Filterable&stock=out')).toEqual([phys.id]);
+    expect(await ids('search=Filterable&stock=in')).toEqual([drop.id]);
+    const titleSorted = await ids('search=Filterable&sort=title');
+    expect(titleSorted).toEqual([drop.id, phys.id]);
+    const page2 = await owner.get('/api/products?search=Filterable&pageSize=1&page=2');
+    expect(page2.body.total).toBe(2);
+    expect(page2.body.items).toHaveLength(1);
+  });
+
   it('enforces case-insensitive unique SKUs and valid barcodes', async () => {
     const owner = await t.as('owner');
     await createProduct(owner, { variants: [{ sku: 'DUP-1' }] });

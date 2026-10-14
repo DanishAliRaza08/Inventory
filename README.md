@@ -33,6 +33,9 @@ run with your real credentials.
 | Profit & finance | Decimal-exact line profit, VAT / US sales tax, UK low-value import rule, fee rules → replaced by actual fees, settlements, refunds, FX, expenses; estimated / partially reconciled / confirmed |
 | Repricing | Live listings below break-even or target margin, proposed prices, apply after approval |
 | Reports | 16 reports (sales/profit by marketplace, SKU, category, supplier, order; low margin; best sellers; slow stock; fees actual vs estimated; refunds; monthly operating profit …) with CSV/XLSX export |
+| Listing templates | Per-marketplace title/description/bullet templates with a live preview against a real SKU; missing facts are left out, never invented |
+| Image checks | Each image checked (Claude vision) for added text/watermarks, borders/collages and — for Amazon main images — a white background; problems on the main image block approval, others are warnings |
+| Scale | Load tested at 20k products / 100k listings / 100k orders a month ([docs/08 §8.6](docs/08-delivery-plan-and-testing.md)) |
 | Automation | Scheduled rules (low margin, supplier out of stock, price rises, dispatch deadlines, failures, stale data, daily summary) with run logs; live-affecting actions approval-gated |
 | AI assistant | Listing title/description/bullets/keywords and buyer-reply drafts from verified facts only (Claude API). Never applied or sent automatically |
 | Privacy | Customer data encrypted per field, every view audited, Amazon data deleted ≤ 30 days after delivery |
@@ -90,6 +93,8 @@ production). **Never commit them or paste them into chat.** After adding them, s
 | `PUBLIC_BASE_URL` | Public **HTTPS** URL of the API, e.g. `https://ops.fashionrockstar.co.uk` | Your domain. Marketplaces redirect here after sign-in and download listing images from here |
 | `WEB_ORIGIN` | URL of the web app | Your domain |
 | `NODE_ENV=production`, `MFA_ENFORCE_FOR_PRIVILEGED=true`, `QUEUE_MODE=bullmq` | Production settings | — |
+| `API_WORKERS` | API processes sharing the port — set to the number of CPU cores | Your server size |
+| `AGGREGATE_CACHE_SECONDS` | How long dashboard/report figures are cached (default 60; 0 = always live) | Optional |
 | `SEED_OWNER_EMAIL`, `SEED_OWNER_PASSWORD` | First owner login (first run only) | You choose |
 
 Build with `pnpm --filter @fr/api build`, then run **two processes**: the API
@@ -150,7 +155,7 @@ supplier product ID / SKU so price and stock sync can find it.
 
 ### 6. AI assistant (optional)
 
-`ANTHROPIC_API_KEY` from [console.anthropic.com](https://console.anthropic.com). `AI_MODEL`
+`ANTHROPIC_API_KEY` from [console.anthropic.com](https://console.anthropic.com). Used for listing copy, buyer-reply drafts and image checks (the worker checks new images every 30 minutes). `AI_MODEL`
 defaults to `claude-opus-5-5`. Without a key the AI buttons say the assistant is not configured (in demo/mock mode they return
 facts-only demo suggestions instead).
 
@@ -168,10 +173,13 @@ facts-only demo suggestions instead).
 ## Tests
 
 ```bash
-pnpm test:core                         # 65 unit tests (money, fees, VAT, profit, lifecycle, inventory)
-TEST_DATABASE_URL=… pnpm test:api      # 81 integration tests on PostgreSQL, incl. every connector vs the mock
+pnpm test:core                         # 66 unit tests (money, fees, VAT, profit, lifecycle, inventory)
+TEST_DATABASE_URL=… pnpm test:api      # 87 integration tests on PostgreSQL, incl. every connector vs the mock
 pnpm --filter @fr/e2e test:e2e         # browser journey (stack running with DEMO_MODE=true)
 ```
+
+Load test (empty, non-production database): `pnpm --filter @fr/api load:data`, start the API on that
+database, then `LOAD_EMAIL=… LOAD_PASSWORD=… pnpm --filter @fr/api load:test`. Results: docs/08 §8.6.
 
 ## Design documents
 
