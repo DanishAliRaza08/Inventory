@@ -57,6 +57,7 @@ body {
 }
 @layer components {
 .card {
+  min-width: 0; /* grid and flex children must not grow to fit wide charts or tables */
   @apply rounded-lg border border-line bg-surface;
 }
 .btn {

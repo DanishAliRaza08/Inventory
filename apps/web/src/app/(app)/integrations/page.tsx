@@ -90,8 +90,8 @@ function IntegrationsInner() {
       </Card>
 
       <Card title="Operations log" className="mt-4" actions={
-        <div className="flex gap-1">
-          <select className="input w-auto" value={opFilter.accountId} onChange={(e) => setOpFilter({ ...opFilter, accountId: e.target.value })} aria-label="Account"><option value="">All accounts</option>{accounts?.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
+        <div className="flex flex-wrap justify-end gap-1">
+          <select className="input w-auto" value={opFilter.accountId} onChange={(e) => setOpFilter({ ...opFilter, accountId: e.target.value })} aria-label="Account" style={{ maxWidth: '10rem' }}><option value="">All accounts</option>{accounts?.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
           <select className="input w-auto" value={opFilter.status} onChange={(e) => setOpFilter({ ...opFilter, status: e.target.value })} aria-label="Status"><option value="">All results</option>{['SUCCEEDED', 'FAILED_TRANSIENT', 'FAILED_PERMANENT', 'UNSUPPORTED'].map((s) => <option key={s} value={s}>{s.replace('_', ' ').toLowerCase()}</option>)}</select>
         </div>}>
         <div className="max-h-[420px] overflow-auto"><table className="w-full min-w-[800px] text-sm">

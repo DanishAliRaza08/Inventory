@@ -47,7 +47,7 @@ export default function ReportsPage() {
             <ul className="space-y-2">{EXPORTS.map(([l, u]) => <li key={u} className="text-sm"><div>{l}</div><div className="mt-1 flex gap-1"><a className="btn" href={`${u}?format=xlsx`}>XLSX</a><a className="btn" href={`${u}?format=csv`}>CSV</a></div></li>)}</ul>
           </div>
         </Card>
-        <div className="lg:col-span-3">
+        <div className="min-w-0 lg:col-span-3">
           <Card title={data?.title ?? 'Report'} actions={data && can('exports.run') && <div className="flex gap-1"><a className="btn" href={`/api/reports/${key}/export${query}${query ? '&' : '?'}format=csv`}>CSV</a><a className="btn" href={`/api/reports/${key}/export${query}${query ? '&' : '?'}format=xlsx`}>XLSX</a></div>}>
             <div className="mb-3 flex flex-wrap items-end gap-2">
               <select className="input w-auto" value={f.preset} onChange={(e) => setF({ ...f, preset: e.target.value })} aria-label="Period">{PRESETS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
