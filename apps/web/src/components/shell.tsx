@@ -12,7 +12,6 @@ interface NavItem {
   label: string;
   icon: string;
   perm?: string;
-  phase?: number;
 }
 
 const NAV: NavItem[] = [
@@ -20,16 +19,17 @@ const NAV: NavItem[] = [
   { href: '/products', label: 'Products & Inventory', icon: '▤', perm: 'products.read' },
   { href: '/listings', label: 'Marketplace Listings', icon: '☰', perm: 'listings.read' },
   { href: '/listings/new', label: 'Listing Builder', icon: '✎', perm: 'listings.write' },
-  { href: '/orders', label: 'Orders', icon: '⧉', perm: 'orders.read', phase: 4 },
+  { href: '/listings/repricing', label: 'Repricing', icon: '⇵', perm: 'listings.approve' },
+  { href: '/orders', label: 'Orders', icon: '⧉', perm: 'orders.read' },
   { href: '/profit', label: 'Profit & Loss', icon: '£', perm: 'costs.read' },
   { href: '/finance', label: 'Costs & Expenses', icon: '¤', perm: 'finance.read' },
   { href: '/suppliers', label: 'Suppliers', icon: '⛟', perm: 'suppliers.read' },
   { href: '/stock', label: 'Stock Monitoring', icon: '◫', perm: 'inventory.read' },
-  { href: '/returns', label: 'Returns & Refunds', icon: '↺', perm: 'orders.read', phase: 4 },
-  { href: '/reports', label: 'Analytics & Reports', icon: '◔', perm: 'exports.run' },
+  { href: '/returns', label: 'Returns & Refunds', icon: '↺', perm: 'orders.read' },
+  { href: '/reports', label: 'Analytics & Reports', icon: '◔', perm: 'reports.read' },
   { href: '/imports', label: 'Import & Export', icon: '⇅', perm: 'imports.run' },
   { href: '/users', label: 'Users & Permissions', icon: '⚇', perm: 'users.manage' },
-  { href: '/automation', label: 'Automation Rules', icon: '⚙', perm: 'automation.manage', phase: 6 },
+  { href: '/automation', label: 'Automation Rules', icon: '⚙', perm: 'automation.manage' },
   { href: '/integrations', label: 'Integrations', icon: '⇄', perm: 'listings.read' },
   { href: '/settings', label: 'Settings', icon: '⚑' },
   { href: '/audit', label: 'Activity & Audit Logs', icon: '⌚', perm: 'audit.read' },
@@ -61,7 +61,7 @@ function GlobalSearch() {
         ...data.products.map((p) => ({ key: p.id, label: `${p.code} · ${p.title}`, kind: 'Product', href: `/products/${p.id}` })),
         ...data.variants.map((v) => ({ key: v.id, label: `${v.sku} · ${v.product.title}`, kind: 'SKU', href: `/products/${v.productId}` })),
         ...data.listings.map((l) => ({ key: l.id, label: `${l.sku} ${l.externalListingId ?? ''}`, kind: l.marketplace, href: `/listings/${l.id}` })),
-        ...data.orders.map((o) => ({ key: o.id, label: `#${o.orderNumber} · ${o.externalOrderId}`, kind: 'Order', href: `/orders` })),
+        ...data.orders.map((o) => ({ key: o.id, label: `#${o.orderNumber} · ${o.externalOrderId}`, kind: 'Order', href: `/orders/${o.id}` })),
         ...data.suppliers.map((s) => ({ key: s.id, label: s.name, kind: 'Supplier', href: `/suppliers/${s.id}` })),
       ]
     : [];
@@ -192,7 +192,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     });
   };
   const nav = NAV.filter((n) => !n.perm || me.permissions.includes(n.perm));
-  const isActive = (href: string) => (href === '/' ? path === '/' : path === href || (path.startsWith(href + '/') && !(href === '/listings' && path.startsWith('/listings/new'))));
+  const isActive = (href: string) => (href === '/' ? path === '/' : path === href || (path.startsWith(href + '/') && !(href === '/listings' && (path.startsWith('/listings/new') || path.startsWith('/listings/repricing')))));
 
   return (
     <div className="flex min-h-screen">
@@ -220,7 +220,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
               {(!collapsed || mobileOpen) && (
                 <span className="flex-1 truncate">
                   {n.label}
-                  {n.phase && <span className="ml-1 text-xs text-muted">· Phase {n.phase}</span>}
                 </span>
               )}
             </Link>

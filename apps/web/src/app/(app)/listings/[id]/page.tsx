@@ -13,6 +13,7 @@ interface Content {
   attributes: Record<string, string | string[]>; requiredAttributes: string[]; verifiedAttributes: string[]; imageIds: string[];
   shippingPolicyId: string | null; returnPolicyId: string | null; dispatchTimeDays: number | null; quantityPolicy: string | null; brand: string | null; gtin: string | null;
   identifierExemption: boolean; searchKeywords: string[]; handlingInstructions: string | null; notes: string | null; complianceSignedOff: boolean;
+  paymentPolicyId: string | null; productType: string | null;
 }
 interface Issue { code: string; field: string; severity: string; blocking: boolean; message: string }
 interface Listing {
@@ -24,6 +25,8 @@ interface Listing {
   statusHistory: Array<{ id: string; fromStatus: string; toStatus: string; event: string; note: string | null; createdAt: string }>;
   operations: Array<{ id: string; operation: string; status: string; errorCode: string | null; readableError: string | null; nextAction: string | null; createdAt: string; retryCount: number }>;
 }
+
+interface Suggestion { title: string; description: string; bulletPoints: string[]; searchKeywords: string[]; categorySuggestion: { name: string; reason: string } | null; missingInformation: Array<{ field: string; why: string }>; claimsNeedingVerification: string[]; warnings: string[] }
 
 const EDITABLE = ['INCOMPLETE', 'DRAFT', 'VALIDATION_FAILED', 'AWAITING_APPROVAL', 'APPROVED', 'PUBLICATION_FAILED'];
 
@@ -37,6 +40,9 @@ export default function ListingBuilder({ params }: { params: Promise<{ id: strin
   const [error, setError] = useState<unknown>(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  const [ai, setAi] = useState<{ source: string; suggestion: Suggestion } | null>(null);
+  const [aiNote, setAiNote] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
 
   const current = l?.versions.find((v) => v.id === l.currentVersionId);
   useEffect(() => {
@@ -97,7 +103,9 @@ export default function ListingBuilder({ params }: { params: Promise<{ id: strin
                 {(l.marketplace === 'EBAY_UK' || l.marketplace === 'EBAY_US') && <>
                   <Field label="Shipping policy ID"><input className="input" value={c.shippingPolicyId ?? ''} onChange={(e) => upd({ shippingPolicyId: e.target.value || null })} /></Field>
                   <Field label="Return policy ID"><input className="input" value={c.returnPolicyId ?? ''} onChange={(e) => upd({ returnPolicyId: e.target.value || null })} /></Field>
+                  <Field label="Payment policy ID" hint="Blank uses the account default"><input className="input" value={c.paymentPolicyId ?? ''} onChange={(e) => upd({ paymentPolicyId: e.target.value || null })} /></Field>
                 </>}
+                {l.marketplace === 'AMAZON_UK' && <Field label="Amazon product type" hint="e.g. DRESS, SHIRT"><input className="input" value={c.productType ?? ''} onChange={(e) => upd({ productType: e.target.value.toUpperCase() || null })} /></Field>}
                 <Field label="Brand"><input className="input" value={c.brand ?? ''} onChange={(e) => upd({ brand: e.target.value || null })} /></Field>
                 <Field label="GTIN / EAN / UPC"><input className="input" value={c.gtin ?? ''} onChange={(e) => upd({ gtin: e.target.value || null })} /></Field>
               </div>
@@ -121,7 +129,8 @@ export default function ListingBuilder({ params }: { params: Promise<{ id: strin
                   ))}
                 </tbody>
               </table>
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button className="btn" disabled={busy || dirty} title={dirty ? 'Save first' : undefined} onClick={() => run(() => api.post(`/listings/${id}/category-attributes`))}>Load required attributes from {MARKETPLACE_NAMES[l.marketplace]}</button>
                 <input className="input max-w-xs" placeholder="Add attribute name" id="newattr" />
                 <button className="btn" onClick={() => { const el = document.getElementById('newattr') as HTMLInputElement; if (el.value) { upd({ attributes: { ...c.attributes, [el.value]: '' } }); el.value = ''; } }}>Add</button>
               </div>
@@ -170,6 +179,27 @@ export default function ListingBuilder({ params }: { params: Promise<{ id: strin
               {['INCOMPLETE', 'DRAFT', 'VALIDATION_FAILED', 'ENDED', 'PUBLICATION_FAILED'].includes(l.status) && can('listings.write') && <button className="btn" disabled={busy} onClick={() => confirm('Archive this listing?') && run(() => api.post(`/listings/${id}/archive`))}>Archive</button>}
             </div>
           </Card>
+
+          {editable && (
+            <Card title="AI listing assistant">
+              <p className="mb-2 text-xs text-ink2">Suggests copy from the catalogue facts only. Nothing is applied until you click a button below and save.</p>
+              <input className="input mb-2" placeholder="Optional instructions, e.g. emphasise the fabric" value={aiNote} onChange={(e) => setAiNote(e.target.value)} aria-label="Instructions for the AI assistant" />
+              <button className="btn" disabled={aiBusy} onClick={async () => { setAiBusy(true); setError(null); try { setAi(await api.post(`/ai/listings/${id}/suggest`, { instructions: aiNote || undefined })); } catch (e) { setError(e); } finally { setAiBusy(false); } }}>{aiBusy ? 'Thinking…' : 'Suggest content'}</button>
+              {ai && (() => { const s = ai.suggestion; return (
+                <div className="mt-3 space-y-3 text-sm">
+                  {ai.source === 'demo' && <Alert tone="info">Demo suggestion — set ANTHROPIC_API_KEY for AI-written copy.</Alert>}
+                  {s.warnings.map((w) => <Alert key={w}>{w}</Alert>)}
+                  <div><div className="label">Title ({s.title.length}/{titleMax})</div><div>{s.title}</div><button className="btn mt-1" onClick={() => upd({ title: s.title })}>Use title</button></div>
+                  <div><div className="label">Description</div><p className="line-clamp-6 whitespace-pre-wrap text-xs">{s.description}</p><button className="btn mt-1" onClick={() => upd({ description: s.description })}>Use description</button></div>
+                  {s.bulletPoints.length > 0 && <div><div className="label">Bullet points</div><ul className="list-disc pl-4 text-xs">{s.bulletPoints.map((b) => <li key={b}>{b}</li>)}</ul><button className="btn mt-1" onClick={() => upd({ bulletPoints: s.bulletPoints })}>Use bullet points</button></div>}
+                  {s.searchKeywords.length > 0 && <div><div className="label">Keywords</div><div className="text-xs">{s.searchKeywords.join(', ')}</div><button className="btn mt-1" onClick={() => upd({ searchKeywords: s.searchKeywords })}>Use keywords</button></div>}
+                  {s.categorySuggestion && <div className="text-xs"><span className="label">Category idea</span>{s.categorySuggestion.name} — {s.categorySuggestion.reason}</div>}
+                  {s.missingInformation.length > 0 && <div><div className="label">Missing information</div><ul className="text-xs">{s.missingInformation.map((m) => <li key={m.field}>▲ <strong>{m.field}</strong>: {m.why}</li>)}</ul></div>}
+                  {s.claimsNeedingVerification.length > 0 && <div><div className="label">Check before publishing</div><ul className="text-xs">{s.claimsNeedingVerification.map((x) => <li key={x}>▲ {x}</li>)}</ul></div>}
+                </div>
+              ); })()}
+            </Card>
+          )}
 
           <Card title="Checks">
             {!validation ? <p className="text-sm text-ink2">Not validated yet.</p> : (

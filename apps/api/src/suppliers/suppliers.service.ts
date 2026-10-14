@@ -73,7 +73,10 @@ export class SuppliersService {
   async get(id: string) {
     const s = await this.prisma.supplier.findUnique({
       where: { id },
-      include: { products: { take: 200, include: { variant: { select: { sku: true, productId: true, product: { select: { title: true } } } } } } },
+      include: {
+        products: { take: 200, include: { variant: { select: { sku: true, productId: true, product: { select: { title: true } } } } } },
+        connection: { select: { status: true, expiresAt: true, lastSyncAt: true, lastError: true } },
+      },
     });
     if (!s) throw new NotFoundException();
     return s;

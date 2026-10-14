@@ -127,7 +127,7 @@ export default function Dashboard() {
                         { key: 'profit', label: 'Net profit', color: 'var(--series-2)', values: sumBy('profit') },
                       ]} />
                   ) : (
-                    <p className="py-10 text-center text-sm text-ink2">No orders in this period. Order data arrives once marketplace order sync is connected (Phase 4).</p>
+                    <p className="py-10 text-center text-sm text-ink2">No orders in this period. Order data arrives from connected marketplaces every few minutes.</p>
                   )}
                 </Card>
                 <Card title="Net profit by marketplace">
