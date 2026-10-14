@@ -26,7 +26,11 @@ export class RepricingService {
     private readonly audit: AuditService,
   ) {}
 
-  async proposals(limit = 200) {
+  proposals(limit = 200) {
+    return this.profit.batch(() => this.findProposals(limit));
+  }
+
+  private async findProposals(limit: number) {
     const minMargin = await this.settings.get('alerts.min_margin_percent');
     const live = await this.prisma.marketplaceListing.findMany({ where: { status: { in: ['ACTIVE', 'PAUSED'] }, price: { not: null } }, include: { variant: { select: { sku: true } } }, take: 2000 });
     const out = [];

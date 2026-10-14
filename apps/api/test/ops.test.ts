@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AiClient, setAiClientFactory } from '../src/ai/ai-assistant.service';
+import { resetConfigCache } from '../src/config';
 import { Agent, TestContext, createProduct, setupApp } from './helpers';
 
 let t: TestContext;
@@ -35,12 +36,27 @@ afterAll(async () => {
 });
 
 describe('AI assistant', () => {
-  it('reports not configured without an API key', async () => {
+  it('gives a facts-only demo suggestion in demo mode without an API key', async () => {
     const s = await owner.get('/api/ai/status');
-    expect(s.body.configured).toBe(false);
+    expect(s.body).toMatchObject({ configured: false, demoMode: true });
     const r = await (await t.as('listing_manager')).post(`/api/ai/listings/${listingId}/suggest`, {});
-    expect(r.status).toBe(503);
-    expect(r.body.code).toBe('AI_NOT_CONFIGURED');
+    expect(r.status).toBe(200);
+    expect(r.body.source).toBe('demo');
+    expect(r.body.suggestion.title).toContain('Satin Slip Skirt');
+    expect(r.body.suggestion.claimsNeedingVerification.join(' ')).toContain('Polyester satin');
+  });
+
+  it('reports not configured without an API key outside demo mode', async () => {
+    process.env.DEMO_MODE = 'false';
+    resetConfigCache();
+    try {
+      const r = await (await t.as('listing_manager')).post(`/api/ai/listings/${listingId}/suggest`, {});
+      expect(r.status).toBe(503);
+      expect(r.body.code).toBe('AI_NOT_CONFIGURED');
+    } finally {
+      process.env.DEMO_MODE = 'true';
+      resetConfigCache();
+    }
   });
 
   it('sends only catalogue facts, enforces marketplace limits and never edits the listing', async () => {

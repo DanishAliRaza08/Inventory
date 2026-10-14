@@ -103,7 +103,12 @@ export class ListingsService {
     });
     if (!l) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Listing not found.' });
     const operations = await this.prisma.marketplaceOperation.findMany({ where: { entityType: 'listing', entityId: id }, orderBy: { createdAt: 'desc' }, take: 50 });
-    return { ...l, operations };
+    // Older, imported or adopted versions may predate newer fields: always return complete content.
+    const versions = l.versions.map((v) => {
+      const parsed = ListingContent.safeParse(v.content ?? {});
+      return parsed.success ? { ...v, content: parsed.data } : v;
+    });
+    return { ...l, versions, operations };
   }
 
   // ───────────────────────── Draft creation & editing ─────────────────────────

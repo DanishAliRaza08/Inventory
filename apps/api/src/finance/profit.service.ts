@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { AsyncLocalStorage } from 'async_hooks';
 import { FeeRule as DbFeeRule } from '@prisma/client';
 import {
   CostRecord,
@@ -51,12 +52,41 @@ export class ProfitService {
     private readonly costs: CostsService,
   ) {}
 
-  async fxTable() {
+  private readonly memo = new AsyncLocalStorage<Map<string, Promise<unknown>>>();
+
+  /**
+   * Run many calculations against one snapshot of FX rates, fee rules and settings (e.g. repricing
+   * every live listing) instead of reloading them for each listing.
+   */
+  batch<T>(fn: () => Promise<T>): Promise<T> {
+    return this.memo.run(new Map(), fn);
+  }
+
+  private cached<T>(key: string, load: () => Promise<T>): Promise<T> {
+    const m = this.memo.getStore();
+    if (!m) return load();
+    if (!m.has(key)) m.set(key, load());
+    return m.get(key) as Promise<T>;
+  }
+
+  private setting<K extends Parameters<SettingsService['get']>[0]>(key: K) {
+    return this.cached(`setting:${key}`, () => this.settings.get(key));
+  }
+
+  fxTable() {
+    return this.cached('fx', () => this.loadFxTable());
+  }
+
+  private async loadFxTable() {
     const rates = await this.prisma.currencyRate.findMany({ orderBy: { asOf: 'desc' }, take: 5000 });
     return new FxTable(rates.map((r) => ({ base: r.base, quote: r.quote, rate: r.rate.toString(), asOf: r.asOf, source: r.source })));
   }
 
-  async feeRules(marketplace: MarketplaceCode) {
+  feeRules(marketplace: MarketplaceCode) {
+    return this.cached(`fees:${marketplace}`, () => this.loadFeeRules(marketplace));
+  }
+
+  private async loadFeeRules(marketplace: MarketplaceCode) {
     const rules = await this.prisma.feeRule.findMany({ where: { marketplace, active: true } });
     return rules.map(toCoreFeeRule);
   }
@@ -67,21 +97,21 @@ export class ProfitService {
    * facilitators and prices are shown before tax. Overridable per calculation.
    */
   async taxDefaults(marketplace: MarketplaceCode, origin: { variantId?: string; shipsFromCountry?: string | null } = {}) {
-    const vatRegistered = await this.settings.get('finance.vat_registered');
-    const rate = await this.settings.get('finance.default_vat_rate_percent');
+    const vatRegistered = await this.setting('finance.vat_registered');
+    const rate = await this.setting('finance.default_vat_rate_percent');
     if (MARKETPLACES[marketplace].country === 'US') {
       return { pricesIncludeTax: false, taxTreatment: 'marketplace_collected' as TaxTreatment | UkImportTaxRule, taxRatePercent: '0' };
     }
     const own: TaxTreatment = vatRegistered ? 'seller_liable' : 'not_registered';
     // VAT is charged at the standard rate on UK sales whether the seller or the marketplace accounts for it.
     const base = { pricesIncludeTax: true, taxRatePercent: rate };
-    if (!(await this.settings.get('finance.auto_low_value_import_vat'))) return { ...base, taxRatePercent: vatRegistered ? rate : '0', taxTreatment: own as TaxTreatment | UkImportTaxRule };
+    if (!(await this.setting('finance.auto_low_value_import_vat'))) return { ...base, taxRatePercent: vatRegistered ? rate : '0', taxTreatment: own as TaxTreatment | UkImportTaxRule };
     const shipsFrom = origin.shipsFromCountry !== undefined ? origin.shipsFromCountry : origin.variantId ? await this.shipsFromForVariant(origin.variantId) : null;
     const rule: UkImportTaxRule = {
       kind: 'uk_low_value_import',
       shipsFromCountry: shipsFrom,
       sellerVatRegistered: vatRegistered,
-      thresholdGbp: await this.settings.get('finance.low_value_import_threshold_gbp'),
+      thresholdGbp: await this.setting('finance.low_value_import_threshold_gbp'),
       saleToGbpRate: 1, // UK marketplaces sell in GBP
     };
     return { ...base, taxTreatment: rule as TaxTreatment | UkImportTaxRule };
@@ -126,7 +156,7 @@ export class ProfitService {
       marketplace: mp,
       categoryId: input.categoryId,
       saleCurrency: MARKETPLACES[mp].currency,
-      reportingCurrency: input.reportingCurrency ?? (await this.settings.get('finance.reporting_currency')),
+      reportingCurrency: input.reportingCurrency ?? (await this.setting('finance.reporting_currency')),
       soldAt: new Date(),
       quantity: input.quantity,
       shippingCharged: input.shippingCharged,
@@ -146,7 +176,7 @@ export class ProfitService {
   async calculate(input: CalcInput) {
     const base = await this.buildBase(input);
     const breakdown = calculateOrderLineProfit({ ...base, unitPrice: input.unitPrice });
-    const thresholds = await this.costs.thresholds();
+    const thresholds = await this.cached('thresholds', () => this.costs.thresholds());
     const breakEven = breakEvenPrice(base);
     return {
       breakdown,

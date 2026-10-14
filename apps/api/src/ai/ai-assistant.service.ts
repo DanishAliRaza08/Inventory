@@ -106,7 +106,7 @@ export class AiAssistantService {
 
   status() {
     const c = config();
-    return { configured: !!c.ANTHROPIC_API_KEY, demoMode: !c.ANTHROPIC_API_KEY && c.MOCK_MARKETPLACES, model: c.AI_MODEL };
+    return { configured: !!c.ANTHROPIC_API_KEY, demoMode: !c.ANTHROPIC_API_KEY && (c.MOCK_MARKETPLACES || c.DEMO_MODE), model: c.AI_MODEL };
   }
 
   private client(): AiClient | null {

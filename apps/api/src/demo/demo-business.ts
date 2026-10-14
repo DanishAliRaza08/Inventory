@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { AuthContext } from '../auth/decorators';
 import { AutomationService, RuleInput } from '../automation/automation.service';
 import { NormalizedOrder } from '../integrations/connector';
+import { ListingContent } from '../listings/listing-content';
 import { SyncService } from '../integrations/sync.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { OrdersService } from '../orders/orders.service';
@@ -72,7 +73,7 @@ const CATALOGUE: DemoProduct[] = [
   { title: 'Canvas Tote Bag', category: 'Accessories', brand: 'Rockstar Basics', material: 'Cotton canvas', colours: ['Natural', 'Black'], sizes: ['One Size'], cost: 1.9, ship: 0.9, priceGbp: 11.99, model: 'PHYSICAL', supplier: 'uk' },
   { title: "Men's Cargo Shorts", category: 'Shorts', brand: 'Rockstar', material: 'Cotton twill', colours: ['Khaki', 'Black'], sizes: ['30', '32', '34', '36'], cost: 6.1, ship: 2.2, priceGbp: 21.99, model: 'DROPSHIP', supplier: 'ae' },
   // Deliberately thin margin so low-profit automation and reports have something to show.
-  { title: "Women's Basic Crew Neck T-Shirt 3-Pack", category: 'T-Shirts', brand: 'Rockstar Basics', material: '100% cotton', colours: ['Mixed'], sizes: ['S', 'M', 'L'], cost: 7.9, ship: 2.9, priceGbp: 16.99, model: 'DROPSHIP', supplier: 'cj' },
+  { title: "Women's Basic Crew Neck T-Shirt 3-Pack", category: 'T-Shirts', brand: 'Rockstar Basics', material: '100% cotton', colours: ['Mixed'], sizes: ['S', 'M', 'L'], cost: 7.9, ship: 2.9, priceGbp: 13.99, model: 'DROPSHIP', supplier: 'cj' },
 ];
 
 const ACCOUNT_WEIGHTS: Record<MarketplaceCode, number> = { EBAY_UK: 0.42, AMAZON_UK: 0.28, TIKTOK_UK: 0.2, EBAY_US: 0.1 };
@@ -181,7 +182,7 @@ export async function seedDemoBusiness(app: INestApplicationContext, opts: DemoB
         data: {
           listingId: listing.id,
           version: 1,
-          content: { title: v.title.slice(0, mp.startsWith('EBAY') ? 80 : 200), description: `${v.title}. DEMO listing.`, condition: 'NEW', categoryId: 'demo-cat', categoryName: 'Clothing (DEMO)', dispatchTimeDays: v.model === 'PHYSICAL' ? 1 : 3, shippingPolicyId: 'demo-ship', returnPolicyId: 'demo-returns', quantityPolicy: 'SYNC', verifiedAttributes: ['Size', 'Colour'] },
+          content: ListingContent.parse({ title: v.title.slice(0, mp.startsWith('EBAY') ? 80 : 200), description: `${v.title}. DEMO listing.`, condition: 'NEW', categoryId: 'demo-cat', categoryName: 'Clothing (DEMO)', dispatchTimeDays: v.model === 'PHYSICAL' ? 1 : 3, shippingPolicyId: 'demo-ship', returnPolicyId: 'demo-returns', quantityPolicy: 'SYNC', verifiedAttributes: ['Size', 'Colour'] }) as Prisma.InputJsonValue,
           submittedAt: status === 'DRAFT' ? null : new Date(now - (days + 6) * DAY),
           approvedAt: live || status === 'PUBLICATION_FAILED' ? new Date(now - (days + 6) * DAY) : null,
         },
@@ -284,7 +285,10 @@ export async function seedDemoBusiness(app: INestApplicationContext, opts: DemoB
           const full = rand() < 0.75;
           const amount = full ? Number(l.unitPrice) * l.quantity : Number(l.unitPrice) * 0.3;
           b.refunds.push({ externalRefundId: `${ext}-R1`, externalOrderId: ext, externalLineId: l.externalLineId, amount: amount.toFixed(2), taxAmount: null, currency: norm.currency, refundedAt: new Date(orderedAt.getTime() + 11 * DAY).toISOString(), reason: full ? pick(['Item not as described', 'Wrong size', 'Changed mind']) : 'Partial refund: minor defect' });
-          if (full) await prisma.return.create({ data: { orderId, status: rand() < 0.7 ? 'RECEIVED' : 'IN_TRANSIT', reason: 'Wrong size', currency: norm.currency, returnShippingCost: mp === 'AMAZON_UK' ? '3.20' : null, restockable: true, receivedAt: new Date(orderedAt.getTime() + 10 * DAY) } });
+          if (full) {
+            const received = rand() < 0.7;
+            await prisma.return.create({ data: { orderId, status: received ? 'RECEIVED' : 'IN_TRANSIT', reason: pick(['Wrong size', 'Not as pictured', 'Changed mind']), currency: norm.currency, returnShippingCost: mp === 'AMAZON_UK' ? '3.20' : null, restockable: received ? true : null, receivedAt: received ? new Date(orderedAt.getTime() + 10 * DAY) : null } });
+          }
         }
       }
     }
