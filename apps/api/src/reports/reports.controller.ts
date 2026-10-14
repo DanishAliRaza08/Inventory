@@ -23,6 +23,7 @@ export class ReportsController {
   constructor(private readonly reports: ReportsService) {}
 
   @Get()
+  @RequirePermissions('reports.read')
   list() {
     return Object.entries(REPORTS).map(([key, r]) => ({ key, title: r.title }));
   }

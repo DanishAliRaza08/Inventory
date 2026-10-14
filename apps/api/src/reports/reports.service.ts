@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, NotFoundException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { Decimal, MarketplaceCode, estimateFees, money } from '@fr/core';
 import { ProfitService } from '../finance/profit.service';
@@ -69,8 +69,8 @@ export class ReportsService {
   }
 
   async run(key: string, f: ReportFilter) {
-    const def = REPORTS[key];
-    if (!def) throw new BadRequestException({ code: 'UNKNOWN_REPORT', message: `Unknown report ${key}` });
+    const def = Object.hasOwn(REPORTS, key) ? REPORTS[key] : undefined;
+    if (!def) throw new NotFoundException({ code: 'UNKNOWN_REPORT', message: `Unknown report ${key}` });
     const currency = await this.settings.get('finance.reporting_currency');
     const L = this.lines(f);
     let rows: Array<Record<string, unknown>> = [];

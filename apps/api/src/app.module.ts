@@ -33,6 +33,8 @@ import { NotificationsController, NotificationsService } from './notifications/n
 import { PrismaModule } from './prisma/prisma.module';
 import { ReportsController } from './reports/reports.controller';
 import { ReportsService } from './reports/reports.service';
+import { AiController } from './ai/ai.controller';
+import { AiAssistantService } from './ai/ai-assistant.service';
 import { AutomationController } from './automation/automation.controller';
 import { AutomationService } from './automation/automation.service';
 import { OrdersController } from './orders/orders.controller';
@@ -63,12 +65,12 @@ import { UsersService } from './users/users.service';
   controllers: [
     HealthController, AuthController, UsersController, AuditController, SettingsController, NotificationsController,
     ProductsController, ImagesController, SuppliersController, CostsController, InventoryController,
-    FinanceController, ListingsController, AccountsController, ImportsController, DashboardController, CustomerPiiController, OrdersController, AutomationController, ReportsController,
+    FinanceController, ListingsController, AccountsController, ImportsController, DashboardController, CustomerPiiController, OrdersController, AutomationController, ReportsController, AiController,
   ],
   providers: [
     CryptoService, AuditService, AuthService, SettingsService, NotificationsService, UsersService, StorageService,
     ProductsService, SuppliersService, CostsService, InventoryService, ProfitService,
-    ListingsService, PublicationService, RepricingService, ConnectorRegistry, AccountContextService, ImageUrlService, ImportsService, DashboardService, CustomerPiiService, OrdersService, SyncService, InventorySyncService, SupplierSyncService, AutomationService, ReportsService,
+    ListingsService, PublicationService, RepricingService, ConnectorRegistry, AccountContextService, ImageUrlService, ImportsService, DashboardService, CustomerPiiService, OrdersService, SyncService, InventorySyncService, SupplierSyncService, AutomationService, ReportsService, AiAssistantService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_INTERCEPTOR, useClass: SerializeInterceptor },
