@@ -19,6 +19,7 @@ const NAV: NavItem[] = [
   { href: '/products', label: 'Products & Inventory', icon: '▤', perm: 'products.read' },
   { href: '/listings', label: 'Marketplace Listings', icon: '☰', perm: 'listings.read' },
   { href: '/listings/new', label: 'Listing Builder', icon: '✎', perm: 'listings.write' },
+  { href: '/listings/templates', label: 'Listing Templates', icon: '❏', perm: 'listings.read' },
   { href: '/listings/repricing', label: 'Repricing', icon: '⇵', perm: 'listings.approve' },
   { href: '/orders', label: 'Orders', icon: '⧉', perm: 'orders.read' },
   { href: '/profit', label: 'Profit & Loss', icon: '£', perm: 'costs.read' },
@@ -192,7 +193,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     });
   };
   const nav = NAV.filter((n) => !n.perm || me.permissions.includes(n.perm));
-  const isActive = (href: string) => (href === '/' ? path === '/' : path === href || (path.startsWith(href + '/') && !(href === '/listings' && (path.startsWith('/listings/new') || path.startsWith('/listings/repricing')))));
+  const isActive = (href: string) => (href === '/' ? path === '/' : path === href || (path.startsWith(href + '/') && !(href === '/listings' && (path.startsWith('/listings/new') || path.startsWith('/listings/repricing') || path.startsWith('/listings/templates')))));
 
   return (
     <div className="flex min-h-screen">

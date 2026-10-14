@@ -214,6 +214,9 @@ model ProductImage {
   /// Provenance: UPLOAD, SUPPLIER, AI_GENERATED. AI images need human approval before use.
   source     String          @default("UPLOAD")
   approved   Boolean         @default(true)
+  /// Result of the automated image check (text/watermark, background, collage). Advisory.
+  checkResult Json?          @map("check_result")
+  checkedAt  DateTime?       @map("checked_at")
   createdAt  DateTime        @default(now()) @map("created_at")
   product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   variant    ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)

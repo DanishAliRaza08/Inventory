@@ -1,13 +1,27 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { AiClient, setAiClientFactory } from '../src/ai/ai-assistant.service';
+import { AiAssistantService, AiClient, setAiClientFactory } from '../src/ai/ai-assistant.service';
 import { resetConfigCache } from '../src/config';
+import { deflateSync } from 'zlib';
 import { Agent, TestContext, createProduct, setupApp } from './helpers';
+
+/** Small valid grey PNG. */
+function png(w = 800, h = 800): Buffer {
+  const table = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc = (b: Buffer) => { let c = 0xffffffff; for (const x of b) c = table[(c ^ x) & 0xff]! ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  const chunk = (type: string, data: Buffer) => { const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const td = Buffer.concat([Buffer.from(type), data]); const c = Buffer.alloc(4); c.writeUInt32BE(crc(td)); return Buffer.concat([len, td, c]); };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 0;
+  const raw = Buffer.alloc((w + 1) * h, 200); for (let y = 0; y < h; y++) raw[y * (w + 1)] = 0;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
 
 let t: TestContext;
 let owner: Agent;
 let listingId: string;
 let accountId: string;
 let lastRequest: any = null;
+let productId: string;
+let variantId: string;
 
 function stubClient(output: object, stop_reason = 'end_turn'): AiClient {
   return {
@@ -25,7 +39,9 @@ beforeAll(async () => {
   owner = await t.as('owner');
   accountId = (await owner.get('/api/integrations/accounts')).body.find((a: any) => a.marketplace === 'EBAY_UK').id;
   const p = await createProduct(owner, { title: 'Satin Slip Skirt', brand: 'Rockstar', category: 'Skirts', variants: [{ sku: 'OPS-SKIRT-10', size: '10', colour: 'Champagne', material: 'Polyester satin', initialCost: { currency: 'GBP', supplierPrice: '6.00' } }] });
-  const d = await (await t.as('listing_manager')).post('/api/listings', { variantId: p.variants[0].id, accountId, price: '19.99' });
+  productId = p.id;
+  variantId = p.variants[0].id;
+  const d = await (await t.as('listing_manager')).post('/api/listings', { variantId, accountId, price: '19.99' });
   expect(d.status).toBe(201);
   listingId = d.body.listingId;
 }, 120_000);
@@ -96,6 +112,65 @@ describe('AI assistant', () => {
   it('requires listings.write', async () => {
     const r = await (await t.as('viewer')).post(`/api/ai/listings/${listingId}/suggest`, {});
     expect(r.status).toBe(403);
+  });
+});
+
+describe('Image checks', () => {
+  let imageId: string;
+  it('records a labelled demo result without an API key, which does not affect validation', async () => {
+    setAiClientFactory(null);
+    const up = await owner.upload(`/api/products/${productId}/images`, 'file', png(), 'skirt.png');
+    expect(up.status, JSON.stringify(up.body)).toBe(201);
+    imageId = up.body.id;
+    const r = await (await t.as('listing_manager')).post(`/api/ai/images/${imageId}/check`);
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.checkResult.source).toBe('demo');
+    expect(r.body.checkedAt).toBeTruthy();
+  });
+
+  it('sends the image to the model and turns detected text into a blocking listing check', async () => {
+    setAiClientFactory(() => stubClient({ hasText: true, hasWatermark: false, hasBorderOrCollage: false, backgroundIsPlainWhite: false, showsProductClearly: true, notes: ['"SALE" text in the corner'] }));
+    const r = await (await t.as('listing_manager')).post(`/api/ai/images/${imageId}/check`);
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.checkResult).toMatchObject({ source: 'claude', hasText: true });
+    const blocks = lastRequest.messages[0].content;
+    expect(blocks[0].type).toBe('image');
+    expect(blocks[0].source.media_type).toBe('image/png');
+    expect(lastRequest.output_config.format.type).toBe('json_schema');
+    await t.prisma.marketplaceListing.update({ where: { id: listingId }, data: { status: 'DRAFT' } });
+    const patch = await (await t.as('listing_manager')).patch(`/api/listings/${listingId}`, { content: { imageIds: [imageId] } });
+    expect(patch.status, JSON.stringify(patch.body)).toBe(200);
+    const v = await (await t.as('listing_manager')).post(`/api/listings/${listingId}/validate`);
+    const issues = (v.body.issues ?? v.body.validation?.issues) as Array<{ code: string; blocking: boolean }>;
+    expect(issues.find((i) => i.code === 'IMAGE_TEXT')?.blocking).toBe(true);
+    expect(issues.map((i) => i.code)).not.toContain('MAIN_IMAGE_BACKGROUND'); // eBay listing: no white-background rule
+  });
+
+  it('checks pending images in the background only when configured', async () => {
+    setAiClientFactory(null);
+    const r = await t.app.get(AiAssistantService).checkPendingImages();
+    expect(r).toEqual({ skipped: 'AI not configured' });
+  });
+});
+
+describe('Listing templates', () => {
+  it('creates, previews against a real SKU, updates and deletes a template', async () => {
+    const lm = await t.as('listing_manager');
+    const body = { name: 'Skirts UK', marketplace: 'EBAY_UK', titleTemplate: '{{#brand}}{{brand}} {{/brand}}{{title}} {{colour}} Size {{size}}', descriptionTemplate: '{{description}}{{#material}}\nMaterial: {{material}}{{/material}}', bulletTemplates: [], isDefault: true };
+    const c = await lm.post('/api/listings/templates', body);
+    expect(c.status, JSON.stringify(c.body)).toBe(201);
+    const prev = await lm.post('/api/listings/templates/preview', { variantId, marketplace: 'EBAY_UK', titleTemplate: body.titleTemplate, descriptionTemplate: body.descriptionTemplate });
+    expect(prev.status, JSON.stringify(prev.body)).toBe(200);
+    expect(prev.body.title).toBe('Rockstar Satin Slip Skirt Champagne Size 10');
+    expect(prev.body.description).toContain('Material: Polyester satin');
+    const u = await lm.put(`/api/listings/templates/${c.body.id}`, { ...body, name: 'Skirts UK v2' });
+    expect(u.status, JSON.stringify(u.body)).toBe(200);
+    expect(u.body.name).toBe('Skirts UK v2');
+    const builtIn = await lm.get('/api/listings/templates/built-in');
+    expect(builtIn.body.AMAZON_UK.bullets.length).toBeGreaterThan(0);
+    expect((await (await t.as('viewer')).delete(`/api/listings/templates/${c.body.id}`)).status).toBe(403);
+    expect((await lm.delete(`/api/listings/templates/${c.body.id}`)).status).toBe(200);
+    expect((await lm.get('/api/listings/templates')).body.find((x: any) => x.id === c.body.id)).toBeUndefined();
   });
 });
 

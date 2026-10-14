@@ -97,8 +97,11 @@ export class DashboardService {
     const productionAccounts = accounts.filter((a) => a.environment !== 'DEMO');
     const lastSync = syncStates.reduce<Date | null>((acc, s) => (s.lastSuccessAt && (!acc || s.lastSuccessAt > acc) ? s.lastSuccessAt : acc), null);
     const staleSync = !lastSync || Date.now() - lastSync.getTime() > STALE_SYNC_HOURS * 3_600_000;
+    const hasDemoAccounts = accounts.some((a) => a.environment === 'DEMO');
     if (!productionAccounts.some((a) => a.status === 'CONNECTED')) {
-      warnings.push('No marketplace account is connected. Order, fee and settlement figures are incomplete until marketplace integrations are live.');
+      warnings.push(hasDemoAccounts
+        ? 'No real marketplace account is connected yet: the figures below come from the DEMO accounts (dummy data). Connect your accounts under Integrations to see live data.'
+        : 'No marketplace account is connected. Order, fee and settlement figures are incomplete until marketplace integrations are live.');
     } else if (staleSync) {
       warnings.push(`Marketplace data has not synced in the last ${STALE_SYNC_HOURS} hours; figures may be out of date.`);
     }

@@ -2,6 +2,7 @@
 import { use, useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { Alert, Card, ErrorText, Field, PageHeader, StatusBadge } from '@/components/ui';
+import { ImageCheck, ImageCheckResult } from '@/components/image-check';
 import { api, fetcher } from '@/lib/api';
 import { MARKETPLACE_NAMES, dateTime, money } from '@/lib/format';
 import { useCan } from '@/lib/session';
@@ -20,7 +21,7 @@ interface Listing {
   id: string; sku: string; marketplace: string; status: string; price: string | null; currency: string; externalListingId: string | null; lastError: string | null;
   currentVersionId: string; publishedVersionId: string | null; createdById: string | null;
   account: { name: string; environment: string; status: string };
-  variant: { id: string; sku: string }; product: { id: string; title: string; restricted: boolean; images: Array<{ id: string; url: string; width: number | null; height: number | null }> };
+  variant: { id: string; sku: string }; product: { id: string; title: string; restricted: boolean; images: Array<{ id: string; url: string; width: number | null; height: number | null; checkResult: ImageCheckResult | null; checkedAt: string | null }> };
   versions: Array<{ id: string; version: number; content: Content; createdAt: string; submittedAt: string | null; approvedAt: string | null; rejectedAt: string | null; reviewNote: string | null; validations: Array<{ valid: boolean; complete: boolean; blockingCount: number; issues: Issue[]; ranAt: string }> }>;
   statusHistory: Array<{ id: string; fromStatus: string; toStatus: string; event: string; note: string | null; createdAt: string }>;
   operations: Array<{ id: string; operation: string; status: string; errorCode: string | null; readableError: string | null; nextAction: string | null; createdAt: string; retryCount: number }>;
@@ -138,7 +139,7 @@ export default function ListingBuilder({ params }: { params: Promise<{ id: strin
             </fieldset>
           </Card>
 
-          <Card title={`Images (${images.length})`}>
+          <Card title={`Images (${images.length})`} actions={editable && images.length > 0 && <button className="btn" disabled={busy} onClick={() => run(async () => { for (const img of images) await api.post(`/ai/images/${img.id}/check`); if (['INCOMPLETE', 'DRAFT', 'VALIDATION_FAILED'].includes(l.status)) await api.post(`/listings/${id}/validate`); })}>Check images</button>}>
             {images.length === 0 && <Alert tone="critical">No images selected.</Alert>}
             <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
               {images.map((img, i) => (
@@ -149,6 +150,7 @@ export default function ListingBuilder({ params }: { params: Promise<{ id: strin
                     <span>{i === 0 ? 'Main' : `#${i + 1}`}</span>
                     {editable && i > 0 && <button onClick={() => { const ids = [...c.imageIds]; [ids[i - 1], ids[i]] = [ids[i]!, ids[i - 1]!]; upd({ imageIds: ids }); }} aria-label="Move earlier">◀</button>}
                   </figcaption>
+                  <ImageCheck result={img.checkResult} checkedAt={img.checkedAt} />
                 </figure>
               ))}
             </div>

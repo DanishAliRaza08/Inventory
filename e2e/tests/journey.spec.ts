@@ -11,7 +11,7 @@ test('unauthenticated users are sent to sign in', async ({ page }) => {
 test('dashboard shows KPIs and the data-completeness warning', async ({ page }) => {
   await login(page);
   await expect(page.getByText('Master products')).toBeVisible();
-  await expect(page.getByText(/No marketplace account is connected/)).toBeVisible();
+  await expect(page.getByText(/No (real )?marketplace account is connected/)).toBeVisible();
   await expect(page.getByText(/Demonstration mode/)).toBeVisible();
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/dashboard.png`, fullPage: true });
 });

@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { AiAssistantService } from './ai/ai-assistant.service';
 import { AppModule } from './app.module';
 import { AutomationService } from './automation/automation.service';
 import { config } from './config';
@@ -49,6 +50,7 @@ async function main() {
   every('Supplier price/stock sync', c.SYNC_SUPPLIERS_EVERY_MIN, () => suppliers.syncAll());
   every('Supplier tracking poll', 30, () => suppliers.pollTracking());
   every('Automation rules', 5, () => app.get(AutomationService).runDue());
+  every('Image checks (AI)', 30, () => app.get(AiAssistantService).checkPendingImages());
   // Personal-data retention (Amazon: ≤ 30 days after delivery).
   every('Customer data purge', 60, () => app.get(CustomerPiiService).purgeExpired());
 }

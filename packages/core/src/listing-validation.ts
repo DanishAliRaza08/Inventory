@@ -25,6 +25,8 @@ export interface MarketplaceListingRules {
   requiresProductIdentifierOrExemption: boolean;
   maxBulletPoints: number;
   requiresDispatchTime: boolean;
+  /** Main image must be the product on a plain white background (Amazon). */
+  mainImageWhiteBackground?: boolean;
 }
 
 export const DEFAULT_LISTING_RULES: Record<MarketplaceCode, MarketplaceListingRules> = {
@@ -41,7 +43,7 @@ export const DEFAULT_LISTING_RULES: Record<MarketplaceCode, MarketplaceListingRu
   AMAZON_UK: {
     titleMaxLength: 200, titleMinLength: 10, maxImages: 9, minImageLongestSidePx: 500, recommendedImageLongestSidePx: 1600,
     allowedImageFormats: ['jpeg', 'png', 'tiff', 'gif'], requiresCondition: true, requiresShippingPolicy: false,
-    requiresReturnPolicy: false, requiresBrand: true, requiresProductIdentifierOrExemption: true, maxBulletPoints: 5, requiresDispatchTime: true,
+    requiresReturnPolicy: false, requiresBrand: true, requiresProductIdentifierOrExemption: true, maxBulletPoints: 5, requiresDispatchTime: true, mainImageWhiteBackground: true,
   },
   TIKTOK_UK: {
     titleMaxLength: 255, titleMinLength: 25, maxImages: 9, minImageLongestSidePx: 300, recommendedImageLongestSidePx: 1200,
@@ -59,6 +61,10 @@ export interface ListingImageInput {
   isMain?: boolean;
   /** Set by an image check that detected overlaid text / watermarks. */
   hasOverlayText?: boolean;
+  /** Image check result: background is not plain white (Amazon main-image rule). */
+  nonWhiteBackground?: boolean;
+  /** Image check result: borders, collage or multiple products in one image. */
+  hasBorderOrCollage?: boolean;
 }
 
 export interface ListingDraftInput {
@@ -212,6 +218,10 @@ export function validateListing(
       err('IMAGE_FORMAT', `images[${i}]`, `Image ${i + 1} format ${img.format} is not accepted.`);
     }
     if (img.hasOverlayText) warn('IMAGE_TEXT', `images[${i}]`, `Image ${i + 1} appears to contain text or watermarks.`, img.isMain === true);
+    if (img.hasBorderOrCollage) warn('IMAGE_COLLAGE', `images[${i}]`, `Image ${i + 1} appears to have a border, collage or several products.`, img.isMain === true);
+    if (img.isMain && rules.mainImageWhiteBackground && img.nonWhiteBackground) {
+      warn('MAIN_IMAGE_BACKGROUND', `images[${i}]`, 'The main image needs a plain white background on this marketplace.', true);
+    }
     if (img.sha256) {
       if (hashes.has(img.sha256)) warn('IMAGE_DUPLICATE', `images[${i}]`, `Image ${i + 1} duplicates image ${hashes.get(img.sha256)! + 1}.`);
       else hashes.set(img.sha256, i);

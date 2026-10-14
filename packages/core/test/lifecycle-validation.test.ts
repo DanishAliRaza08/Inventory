@@ -72,6 +72,18 @@ describe('listing validation', () => {
     const r = validateListing({ ...good, images: [good.images![0]!, { url: 'b', width: 300, height: 300, format: 'bmp', sha256: 'a' }] });
     expect(r.issues.map((i) => i.code)).toEqual(expect.arrayContaining(['IMAGE_TOO_SMALL', 'IMAGE_DUPLICATE']));
   });
+  it('uses image check results: text, collage and the Amazon white-background rule', () => {
+    const main = { ...good.images![0]!, isMain: true, hasOverlayText: true, nonWhiteBackground: true };
+    const ebay = validateListing({ ...good, images: [main] });
+    const codes = ebay.issues.map((i) => i.code);
+    expect(codes).toContain('IMAGE_TEXT');
+    expect(codes).not.toContain('MAIN_IMAGE_BACKGROUND'); // eBay has no white-background rule
+    expect(ebay.issues.find((i) => i.code === 'IMAGE_TEXT')!.blocking).toBe(true);
+    const amz = validateListing({ ...good, marketplace: 'AMAZON_UK', images: [main] });
+    expect(amz.issues.find((i) => i.code === 'MAIN_IMAGE_BACKGROUND')?.blocking).toBe(true);
+    const second = validateListing({ ...good, images: [good.images![0]!, { url: 'c', width: 1600, height: 1600, format: 'jpeg', sha256: 'z', hasBorderOrCollage: true }] });
+    expect(second.issues.find((i) => i.code === 'IMAGE_COLLAGE')?.blocking).toBe(false);
+  });
   it('warns when price is below minimum profitable price', () => {
     expect(validateListing({ ...good, minimumProfitablePrice: '30' }).issues.map((i) => i.code)).toContain('BELOW_MIN_PROFITABLE_PRICE');
   });

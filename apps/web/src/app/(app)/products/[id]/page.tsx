@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { use, useState } from 'react';
 import useSWR from 'swr';
 import { Alert, Card, ErrorText, Field, Modal, PageHeader, StatusBadge } from '@/components/ui';
+import { ImageCheck, ImageCheckResult } from '@/components/image-check';
 import { api, fetcher } from '@/lib/api';
 import { MARKETPLACE_NAMES, ago, money } from '@/lib/format';
 import { useCan } from '@/lib/session';
@@ -15,7 +16,7 @@ interface Variant {
 }
 interface Product {
   id: string; code: string; title: string; description: string; category: string | null; brand: string | null; status: string; fulfilmentModel: string; restricted: boolean;
-  images: Array<{ id: string; url: string; width: number | null; height: number | null; isMain: boolean }>;
+  images: Array<{ id: string; url: string; width: number | null; height: number | null; isMain: boolean; checkResult: ImageCheckResult | null; checkedAt: string | null }>;
   variants: Variant[];
   listings: Array<{ id: string; marketplace: string; status: string; sku: string; price: string | null; currency: string; externalListingId: string | null; account: { name: string } }>;
 }
@@ -44,6 +45,10 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
   if (loadError) return <ErrorText error={loadError} />;
   if (!p) return <p className="text-sm text-ink2">Loading…</p>;
 
+  const checkImages = async () => {
+    setError(null);
+    try { await api.post(`/ai/products/${p.id}/check-images`); void mutate(); } catch (e) { setError(e); }
+  };
   const upload = async (file: File) => {
     try { await api.upload(`/products/${p.id}/images`, file); void mutate(); } catch (e) { setError(e); }
   };
@@ -57,14 +62,14 @@ export default function ProductDetail({ params }: { params: Promise<{ id: string
       />
       <ErrorText error={error} />
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card title="Images" className="lg:col-span-1" actions={can('listings.write') && <label className="btn cursor-pointer">Upload<input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} /></label>}>
+        <Card title="Images" className="lg:col-span-1" actions={can('listings.write') && <div className="flex gap-1">{p.images.length > 0 && <button className="btn" onClick={checkImages} title="Checks for text, watermarks, borders and background">Check images</button>}<label className="btn cursor-pointer">Upload<input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} /></label></div>}>
           {p.images.length === 0 ? <Alert>No images yet. Every listing needs at least one image.</Alert> : (
             <div className="grid grid-cols-3 gap-2">
               {p.images.map((img) => (
                 <figure key={img.id} className="relative">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.url} alt="" className="aspect-square w-full rounded border border-line object-cover" />
-                  <figcaption className="text-xs text-muted">{img.isMain ? 'Main · ' : ''}{img.width}×{img.height}</figcaption>
+                  <figcaption className="text-xs text-muted">{img.isMain ? 'Main · ' : ''}{img.width}×{img.height}<ImageCheck result={img.checkResult} checkedAt={img.checkedAt} /></figcaption>
                 </figure>
               ))}
             </div>

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { Prisma } from '@prisma/client';
 import { Injectable, NotFoundException, ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
 import { DEFAULT_LISTING_RULES, MarketplaceCode } from '@fr/core';
 import { AuditService } from '../audit/audit.service';
@@ -6,6 +7,7 @@ import type { AuthContext } from '../auth/decorators';
 import { config } from '../config';
 import { ListingContent } from '../listings/listing-content';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 
 /** Minimal surface of the Anthropic client we use, so tests can inject a stub. */
 export interface AiClient {
@@ -97,11 +99,50 @@ You receive the buyer's message and a JSON block of order facts (status, dispatc
 - Be polite, concise and in British English (American English for EBAY_US orders). Do not ask for or repeat personal data. Sign off as "Fashion Rockstar Customer Care".
 Your draft is reviewed by a person before it is sent.`;
 
+export interface ImageCheck {
+  hasText: boolean;
+  hasWatermark: boolean;
+  hasBorderOrCollage: boolean;
+  backgroundIsPlainWhite: boolean;
+  showsProductClearly: boolean;
+  notes: string[];
+}
+
+const IMAGE_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['hasText', 'hasWatermark', 'hasBorderOrCollage', 'backgroundIsPlainWhite', 'showsProductClearly', 'notes'],
+  properties: {
+    hasText: { type: 'boolean' },
+    hasWatermark: { type: 'boolean' },
+    hasBorderOrCollage: { type: 'boolean' },
+    backgroundIsPlainWhite: { type: 'boolean' },
+    showsProductClearly: { type: 'boolean' },
+    notes: { type: 'array', items: { type: 'string' } },
+  },
+} as const;
+
+const IMAGE_SYSTEM = `You check product photos for a UK fashion retailer before they are used on eBay, Amazon and TikTok Shop listings.
+
+Marketplaces reject or demote images with added text, logos or watermarks, borders, collages or several products in one frame, and Amazon requires the main image to show the product on a pure white background. Report what you see:
+- hasText: any text overlaid on the photo (prices, slogans, sizes, "free shipping"). Text that is part of the product itself, such as a printed T-shirt design or a brand label sewn into the garment, does NOT count — mention it in notes instead.
+- hasWatermark: a watermark or a seller/website logo added on top of the photo.
+- hasBorderOrCollage: a frame or border, several photos combined, or several different products shown.
+- backgroundIsPlainWhite: the background is plain white (or very near white) with no scene or props.
+- showsProductClearly: the garment or item is in focus, well lit and fills most of the frame.
+- notes: short, specific observations a person should check. Empty if nothing to add.
+Judge only what is visible. If unsure, say so in notes rather than guessing.`;
+
+const IMAGE_MEDIA: Record<string, 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'> = { jpeg: 'image/jpeg', jpg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' };
+/** The API accepts images up to 5 MB once base64-encoded. */
+const MAX_IMAGE_BYTES = 3_700_000;
+
 @Injectable()
 export class AiAssistantService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly storage: StorageService,
   ) {}
 
   status() {
@@ -115,7 +156,7 @@ export class AiAssistantService {
     return key ? new Anthropic({ apiKey: key, maxRetries: 2, timeout: 120_000 }) : null;
   }
 
-  private async callJson<T>(system: string, user: string, schema: Record<string, unknown>): Promise<{ data: T; usage: unknown }> {
+  private async callJson<T>(system: string, user: string | Anthropic.ContentBlockParam[], schema: Record<string, unknown>): Promise<{ data: T; usage: unknown }> {
     const client = this.client();
     if (!client) throw new ServiceUnavailableException({ code: 'AI_NOT_CONFIGURED', message: 'The AI assistant is not configured. Set ANTHROPIC_API_KEY on the server.' });
     let msg: Anthropic.Message;
@@ -222,6 +263,52 @@ export class AiAssistantService {
     if (facts.product.restricted) suggestion.warnings.push('This product is marked restricted: compliance sign-off is required before approval.');
     await this.audit.record(actor, { action: 'ai.listing_suggest', entityType: 'listing', entityId: listingId, after: { source, model: source === 'claude' ? config().AI_MODEL : null, usage } });
     return { source, model: source === 'claude' ? config().AI_MODEL : null, suggestion, appliedAutomatically: false };
+  }
+
+  /**
+   * Check one product image for text/watermarks, borders/collages and background. Results are
+   * stored on the image and used by listing validation; they never block uploads.
+   */
+  async checkImage(imageId: string, actor: AuthContext | null) {
+    const img = await this.prisma.productImage.findUnique({ where: { id: imageId } });
+    if (!img) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Image not found.' });
+    let result: ImageCheck & { source: 'claude' | 'demo' | 'skipped'; model: string | null };
+    const media = IMAGE_MEDIA[(img.format ?? '').toLowerCase()];
+    if (this.status().demoMode && !clientFactory) {
+      result = { hasText: false, hasWatermark: false, hasBorderOrCollage: false, backgroundIsPlainWhite: true, showsProductClearly: true, notes: ['Demo result: the image was not analysed (set ANTHROPIC_API_KEY for real checks).'], source: 'demo', model: null };
+    } else if (!media || (img.sizeBytes ?? 0) > MAX_IMAGE_BYTES) {
+      result = { hasText: false, hasWatermark: false, hasBorderOrCollage: false, backgroundIsPlainWhite: false, showsProductClearly: false, notes: [!media ? `Format ${img.format} cannot be checked automatically.` : 'Image is larger than 3.7 MB; check it by eye or upload a smaller copy.'], source: 'skipped', model: null };
+    } else {
+      const data = (await this.storage.get(img.storageKey)).toString('base64');
+      const r = await this.callJson<ImageCheck>(
+        IMAGE_SYSTEM,
+        [
+          { type: 'image', source: { type: 'base64', media_type: media, data } },
+          { type: 'text', text: `Check this product image (${img.isMain ? 'main image' : 'additional image'}).` },
+        ],
+        IMAGE_SCHEMA as unknown as Record<string, unknown>,
+      );
+      result = { ...r.data, source: 'claude', model: config().AI_MODEL };
+    }
+    const updated = await this.prisma.productImage.update({ where: { id: imageId }, data: { checkResult: result as unknown as Prisma.InputJsonValue, checkedAt: new Date() } });
+    await this.audit.record(actor, { action: 'ai.image_check', entityType: 'product', entityId: img.productId, after: { imageId, source: result.source, hasText: result.hasText, hasWatermark: result.hasWatermark } });
+    return updated;
+  }
+
+  /** Background task: check images uploaded since the last run (only when the AI service is configured). */
+  async checkPendingImages(limit = 20) {
+    if (!this.status().configured) return { skipped: 'AI not configured' };
+    const pending = await this.prisma.productImage.findMany({ where: { checkedAt: null }, orderBy: { createdAt: 'asc' }, take: limit, select: { id: true } });
+    let checked = 0;
+    for (const p of pending) {
+      try {
+        await this.checkImage(p.id, null);
+        checked++;
+      } catch {
+        break; // service unavailable or rate-limited: try again next run
+      }
+    }
+    return { checked, remaining: Math.max(0, (await this.prisma.productImage.count({ where: { checkedAt: null } }))) };
   }
 
   /** Draft a reply to a buyer message for an order. Sends order status facts only, never customer PII. */

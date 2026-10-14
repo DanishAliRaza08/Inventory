@@ -111,6 +111,13 @@ export class ListingsService {
     return { ...l, versions, operations };
   }
 
+  /** Render a template against a real SKU without saving anything (template editor preview). */
+  async previewTemplate(variantId: string, marketplace: MarketplaceCode, tpl: { title: string; description: string; bullets: string[] }) {
+    const { v, vars, imageIds } = await this.masterVars(variantId);
+    const { content, notes } = buildContentFromMaster(marketplace, vars, imageIds, { gtin: v.barcode, attributes: v.attributes as Record<string, string> }, tpl);
+    return { sku: v.sku, title: content.title, description: content.description, bulletPoints: content.bulletPoints, attributes: content.attributes, notes, variables: vars };
+  }
+
   // ───────────────────────── Draft creation & editing ─────────────────────────
 
   private async masterVars(variantId: string) {
@@ -252,7 +259,14 @@ export class ListingsService {
       quantityPolicy: c.quantityPolicy,
       images: c.imageIds.map((id, idx) => {
         const img = imagesById.get(id);
-        return { url: img?.url ?? `missing:${id}`, width: img?.width ?? undefined, height: img?.height ?? undefined, format: img?.format ?? undefined, sha256: img?.sha256 ?? undefined, isMain: idx === 0 };
+        const check = img?.checkResult as { source?: string; hasText?: boolean; hasWatermark?: boolean; hasBorderOrCollage?: boolean; backgroundIsPlainWhite?: boolean } | null | undefined;
+        const analysed = check?.source === 'claude';
+        return {
+          url: img?.url ?? `missing:${id}`, width: img?.width ?? undefined, height: img?.height ?? undefined, format: img?.format ?? undefined, sha256: img?.sha256 ?? undefined, isMain: idx === 0,
+          hasOverlayText: analysed ? !!(check!.hasText || check!.hasWatermark) : undefined,
+          hasBorderOrCollage: analysed ? !!check!.hasBorderOrCollage : undefined,
+          nonWhiteBackground: analysed ? check!.backgroundIsPlainWhite === false : undefined,
+        };
       }),
       attributes: c.attributes,
       shippingPolicyId: c.shippingPolicyId,

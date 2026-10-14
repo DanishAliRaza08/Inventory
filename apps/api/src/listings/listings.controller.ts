@@ -1,11 +1,12 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
+import { AuditService } from '../audit/audit.service';
 import { Auth, AuthContext, RequirePermissions } from '../auth/decorators';
 import { ApiZodBody, ApiZodQuery, ZodPipe, zMoneyNonNeg, zPagination } from '../common/zod';
 import { zMarketplace } from '../finance/finance.schemas';
 import { PrismaService } from '../prisma/prisma.service';
-import { ListingContentPatch } from './listing-content';
+import { BUILT_IN_TEMPLATES, ListingContentPatch } from './listing-content';
 import { ListingsService } from './listings.service';
 import { PublicationService } from './publication.service';
 import { RepricingService } from './repricing.service';
@@ -49,6 +50,13 @@ const BulkDrafts = z.object({
 });
 const SyncFields = z.object({ fields: z.array(z.enum(['title', 'description', 'bulletPoints', 'attributes', 'imageIds', 'gtin', 'brand'])).min(1) });
 const RepriceBody = z.object({ price: zMoneyNonNeg, note: z.string().max(500).optional() });
+const TemplatePreview = z.object({
+  variantId: z.string().uuid(),
+  marketplace: zMarketplace,
+  titleTemplate: z.string().min(1).max(500),
+  descriptionTemplate: z.string().max(20000),
+  bulletTemplates: z.array(z.string().max(1000)).max(10).default([]),
+});
 const TemplateBody = z.object({
   name: z.string().min(1).max(80),
   marketplace: zMarketplace,
@@ -67,6 +75,7 @@ export class ListingsController {
     private readonly publication: PublicationService,
     private readonly prisma: PrismaService,
     private readonly repricing: RepricingService,
+    private readonly audit: AuditService,
   ) {}
 
   @Get('repricing/proposals')
@@ -102,6 +111,12 @@ export class ListingsController {
     return this.prisma.listingTemplate.findMany({ orderBy: [{ marketplace: 'asc' }, { name: 'asc' }] });
   }
 
+  @Get('templates/built-in')
+  @RequirePermissions('listings.read')
+  builtInTemplates() {
+    return BUILT_IN_TEMPLATES;
+  }
+
   @Post('templates')
   @RequirePermissions('listings.write')
   @ApiZodBody(TemplateBody)
@@ -110,6 +125,36 @@ export class ListingsController {
       if (body.isDefault) await tx.listingTemplate.updateMany({ where: { marketplace: body.marketplace }, data: { isDefault: false } });
       return tx.listingTemplate.create({ data: { ...body, createdById: auth.userId } });
     });
+  }
+
+  @Put('templates/:templateId')
+  @RequirePermissions('listings.write')
+  @ApiZodBody(TemplateBody)
+  async updateTemplate(@Param('templateId', ParseUUIDPipe) templateId: string, @Body(new ZodPipe(TemplateBody)) body: z.infer<typeof TemplateBody>, @Auth() auth: AuthContext) {
+    return this.prisma.$transaction(async (tx) => {
+      const before = await tx.listingTemplate.findUniqueOrThrow({ where: { id: templateId } });
+      if (body.isDefault) await tx.listingTemplate.updateMany({ where: { marketplace: body.marketplace, id: { not: templateId } }, data: { isDefault: false } });
+      const t = await tx.listingTemplate.update({ where: { id: templateId }, data: body });
+      await this.audit.record(auth, { action: 'listing_template.update', entityType: 'listing_template', entityId: templateId, before, after: t }, tx);
+      return t;
+    });
+  }
+
+  @Delete('templates/:templateId')
+  @RequirePermissions('listings.write')
+  async deleteTemplate(@Param('templateId', ParseUUIDPipe) templateId: string, @Auth() auth: AuthContext) {
+    // Existing drafts keep their rendered content; templates are only used when a draft is created.
+    const before = await this.prisma.listingTemplate.delete({ where: { id: templateId } });
+    await this.audit.record(auth, { action: 'listing_template.delete', entityType: 'listing_template', entityId: templateId, before });
+    return { deleted: true };
+  }
+
+  @Post('templates/preview')
+  @HttpCode(200)
+  @RequirePermissions('listings.read')
+  @ApiZodBody(TemplatePreview)
+  previewTemplate(@Body(new ZodPipe(TemplatePreview)) body: z.infer<typeof TemplatePreview>) {
+    return this.listings.previewTemplate(body.variantId, body.marketplace, { title: body.titleTemplate, description: body.descriptionTemplate, bullets: body.bulletTemplates });
   }
 
   @Get(':id')
