@@ -30,23 +30,30 @@ Two separate marketplace contexts: different site, currency (GBP/USD), business 
 categories, item specifics and fee schedules. One OAuth app can serve both, but each account
 connection, policy set and listing is stored per context.
 
-| Operation | Official API (REST unless noted) | OAuth scope (user token) | Notes to verify |
-|---|---|---|---|
-| Connect account | OAuth 2.0 authorization code grant; refresh token | — | Production keyset requires eBay developer program approval; subscribe to (or opt out of) **marketplace account deletion notifications**, which eBay requires for all apps |
-| Categories | Commerce **Taxonomy API** `getDefaultCategoryTreeId`, `getCategorySuggestions`, `getCategoryTree` | application token | per marketplace id |
-| Item specifics | Taxonomy API `getItemAspectsForCategory` | application token | cached per category → `requiredAttributes` |
-| Business policies | **Account API** `getFulfillmentPolicies`, `getReturnPolicies`, `getPaymentPolicies` | `sell.account` | account must be opted in to business policies |
-| Create listing | **Inventory API** `createOrReplaceInventoryItem` → `createOffer` → `publishOffer` | `sell.inventory` | requires an inventory location (`createInventoryLocation`); `publishOffer` returns the listing id; idempotent by SKU |
-| Revise listing | `createOrReplaceInventoryItem` / `updateOffer` | `sell.inventory` | |
-| Price & quantity | `bulkUpdatePriceQuantity` | `sell.inventory` | batches of up to 25 |
-| Pause | quantity → 0 with out-of-stock control | `sell.inventory` / `sell.account` | eBay fixed-price listings have no "pause" state |
-| End | `withdrawOffer` | `sell.inventory` | |
-| Existing Seller Hub listings | `bulkMigrateListing` | `sell.inventory` | Listings created outside the Inventory API must be migrated before the Inventory API can manage them — **decide before go-live** (migration is one-way) |
-| Orders | **Fulfillment API** `getOrders` | `sell.fulfillment` | buyer address restricted to Order Manager role |
-| Tracking | Fulfillment API `createShippingFulfillment` | `sell.fulfillment` | dispatch only after carrier/supplier confirmation |
-| Returns | **Post-Order API** (returns, cancellations) | per Post-Order docs | verify availability for the UK/US accounts |
-| Fees & payouts | **Finances API** `getTransactions`, `getPayouts` | `sell.finances` | eBay requires **digital signatures** on Finances API calls for some (incl. UK/EU) sellers — verify and implement signing |
-| Notifications | Platform / Notification API topics | — | webhook where available, scheduled reconciliation as fallback |
+> **Decision (October 2026): keep managing eBay listings the existing way.** Listing operations use
+> the **Trading API**, so every listing — existing and new — stays editable in Seller Hub and no
+> listing is migrated to the Inventory API (that migration is one-way and Inventory API listings
+> can no longer be edited in Seller Hub). Existing listings are adopted into the platform from
+> eBay's own data. REST APIs are used only where they don't change how listings are managed.
+
+| Operation | Official API | Notes to verify |
+|---|---|---|
+| Connect account | OAuth 2.0 authorization code grant (user access + refresh token); the OAuth user token is accepted by the Trading API | Production keyset requires eBay developer program approval; subscribe to (or opt out of) **marketplace account deletion notifications**, required for all apps |
+| Categories | Commerce **Taxonomy API** `getCategoryTree`, `getCategorySuggestions` | per site |
+| Item specifics | Taxonomy API `getItemAspectsForCategory` | cached per category → `requiredAttributes` |
+| Business policies | **Account API** `getFulfillmentPolicies` / `getReturnPolicies` / `getPaymentPolicies` | policy profile ids are used in Trading API `SellerProfiles` |
+| **Adopt existing listings** | **Trading API** `GetSellerList` / `GetMyeBaySelling` + `GetItem` | Imports live Seller Hub listings as `ACTIVE` (confirmed by eBay's data, never by hand), linking them to master SKUs by Custom Label (SKU); unmatched listings go to a review queue |
+| Create listing | Trading API `VerifyAddFixedPriceItem` → `AddFixedPriceItem` | the Verify call is the pre-approval check; returns the ItemID |
+| Revise listing | Trading API `ReviseFixedPriceItem` | only the fields that changed are sent, so marketplace-only settings made in Seller Hub are not overwritten |
+| Price & quantity | Trading API `ReviseInventoryStatus` (up to 4 items per call) | |
+| Pause | `ReviseInventoryStatus` quantity 0 with out-of-stock control | eBay fixed-price listings have no "pause" state |
+| End | Trading API `EndFixedPriceItem` | |
+| Status | Trading API `GetItem` | |
+| Orders | **Fulfillment API** `getOrders` | buyer details encrypted; Order Manager role only |
+| Tracking | Fulfillment API `createShippingFulfillment` | dispatch only after carrier/supplier confirmation |
+| Returns | **Post-Order API** | verify availability for the UK/US accounts |
+| Fees & payouts | **Finances API** `getTransactions`, `getPayouts` | **digital signatures** required for UK/EU sellers |
+| Notifications | Trading API platform notifications (`ItemListed`, `ItemRevised`, `FixedPriceTransaction`…) | scheduled reconciliation as fallback |
 
 ## 4.3 Amazon UK (marketplace id `A1F83G8C2ARO7P`) — Selling Partner API
 
@@ -60,12 +67,34 @@ connection, policy set and listing is stored per context.
 | Price & quantity | `patchListingsItem` (`purchasable_offer`, `fulfillment_availability`) | Pricing; Inventory and Order Tracking | |
 | Pause / delete | quantity 0 / `deleteListingsItem` | Product Listing | |
 | Listing issues | `getListingsItem` (issues, status); `LISTINGS_ITEM_ISSUES_CHANGE` notification | Product Listing | |
-| Orders | **Orders API** `getOrders`, `getOrderItems` | Inventory and Order Tracking | buyer PII needs the restricted **Direct-to-Consumer Shipping** role and a **Restricted Data Token** (Tokens API) |
-| Tracking | Orders API `confirmShipment` (or order fulfillment feed) | Direct-to-Consumer Shipping | |
+| Adopt existing listings | Reports API `GET_MERCHANT_LISTINGS_ALL_DATA` + `getListingsItem` | Product Listing | links existing offers to master SKUs by seller SKU |
+| Orders | **Orders API** `getOrders`, `getOrderItems` | Inventory and Order Tracking | buyer name/address via a **Restricted Data Token** (Tokens API) |
+| Tracking | Orders API `confirmShipment` | Direct-to-Consumer Shipping | |
 | Fees | **Finances API** `listFinancialEvents` (by order / group) | Finance and Accounting | |
 | Settlements | **Reports API** settlement report (`GET_V2_SETTLEMENT_REPORT_DATA_FLAT_FILE_V2`) | Finance and Accounting | settlement → `confirmed` profit |
 | Returns | Reports API returns reports | per report | |
 | Notifications | **Notifications API** (SQS / EventBridge destinations) | — | |
+
+### Amazon self-fulfilment (decision October 2026)
+
+Fashion Rockstar ships Amazon orders itself (merchant-fulfilled), so the app needs Amazon's
+**restricted Direct-to-Consumer Shipping role** to read buyer names and addresses. Amazon grants it
+only after reviewing the developer profile against its **Data Protection Policy (DPP)** and
+Acceptable Use Policy. What the platform already does for that review:
+
+| DPP expectation | How it is met |
+|---|---|
+| PII used only for fulfilment, minimum necessary | Only name, address, phone/email needed for shipping are stored, in `order_customers` |
+| Encryption at rest and in transit | Each PII field AES-256-GCM encrypted by the application (on top of database/disk encryption); HTTPS only |
+| Retention: delete within 30 days after delivery | `privacy.amazon_pii_retention_days_after_delivery` (max 30, enforced); clock restarts at delivery; hourly purge job; purge is audited |
+| Access control | Only `orders.customer_pii` (Order Manager, Owner); individual accounts, MFA for privileged roles |
+| Logging & monitoring | Every PII read is written to the append-only audit log |
+| Incident response | Security incidents involving Amazon data must be reported to Amazon within 24 hours — process in `docs/09-deployment.md` |
+| No PII in logs, exports or the browser cache beyond the order screen | PII is excluded from exports and API logs |
+
+Still needed from Fashion Rockstar before applying: a written security/incident policy, and
+confirmation of where the platform is hosted (Amazon asks for the hosting provider and its
+encryption/backup arrangements).
 
 ## 4.4 TikTok Shop UK — TikTok Shop Open API (Partner Center)
 
@@ -87,13 +116,18 @@ API versions (e.g. `202309`) change; pin the version per endpoint and track depr
 
 ## 4.5 Suppliers
 
+Code: `apps/api/src/integrations/supplier-connectors.ts` (capabilities shown on the Integrations page).
+
 | Supplier | Integration | Use |
 |---|---|---|
-| CJ Dropshipping | Official CJ API (product, variant stock, order creation, tracking) | stock & price checks, optional order placement, tracking retrieval — Phase 4 |
-| AliExpress | Official AliExpress Open Platform APIs (dropshipping) **only if the account is approved**; otherwise manual | otherwise: manual price/stock checks recorded with source + timestamp, manual ordering checklist |
-| Others | CSV/XLSX price & stock files, manual entry | |
+| AliExpress | **Official AliExpress Open Platform dropshipping (DS) APIs** (decision October 2026): product/SKU query (price, stock, ship-from warehouse), order create, order and logistics tracking. Signed requests with the app key/secret, seller authorisation | Phase 4. Needs the approved app's key and secret (stored encrypted, never in the repository). Until approved, AliExpress stays manual: price/stock checks recorded with source and time |
+| CJ Dropshipping | Official CJ API (product, variant inventory per warehouse, create order, tracking) | Phase 4 |
+| Others | CSV/XLSX price & stock files, manual entry | now |
 
-Supplier-reported stock is treated as a signal, never as owned inventory (see document 7).
+Supplier orders are **never placed automatically**: a staff member confirms each one. Supplier-
+reported stock is a signal, never owned inventory (see document 7). The supplier's
+**ships-from country** (per supplier, overridable per SKU, filled from the API when available)
+drives the UK low-value import VAT rule (document 5).
 
 ## 4.6 Error handling contract (all connectors)
 

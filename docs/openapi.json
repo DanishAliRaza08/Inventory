@@ -1517,6 +1517,17 @@
                     ],
                     "default": "USD"
                   },
+                  "shipsFromCountry": {
+                    "allOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[A-Z]{2}$"
+                      }
+                    ]
+                  },
                   "processingDays": {
                     "type": "integer",
                     "minimum": 0
@@ -1670,6 +1681,17 @@
                       {
                         "type": "string",
                         "pattern": "^[A-Z]{3}$"
+                      }
+                    ]
+                  },
+                  "shipsFromCountry": {
+                    "allOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[A-Z]{2}$"
                       }
                     ]
                   },
@@ -2382,7 +2404,7 @@
                   "asOf": {
                     "type": "string",
                     "format": "date-time",
-                    "default": "2026-10-13T21:33:00.334Z"
+                    "default": "2026-10-14T14:26:55.666Z"
                   },
                   "source": {
                     "type": "string",
@@ -2551,7 +2573,7 @@
                   "effectiveFrom": {
                     "type": "string",
                     "format": "date-time",
-                    "default": "2026-10-13T21:33:00.336Z"
+                    "default": "2026-10-14T14:26:55.667Z"
                   },
                   "effectiveTo": {
                     "type": "string",
@@ -2742,6 +2764,18 @@
                   "pricesIncludeTax": {
                     "type": "boolean"
                   },
+                  "shipsFromCountry": {
+                    "allOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[A-Z]{2}$"
+                      }
+                    ],
+                    "nullable": true
+                  },
                   "reportingCurrency": {
                     "$ref": "#/properties/cost/properties/currency"
                   }
@@ -2891,6 +2925,18 @@
                   },
                   "pricesIncludeTax": {
                     "type": "boolean"
+                  },
+                  "shipsFromCountry": {
+                    "allOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[A-Z]{2}$"
+                      }
+                    ],
+                    "nullable": true
                   },
                   "reportingCurrency": {
                     "$ref": "#/properties/cost/properties/currency"
@@ -4818,6 +4864,43 @@
         },
         "tags": [
           "Dashboard"
+        ]
+      }
+    },
+    "/api/orders/{id}/customer": {
+      "get": {
+        "operationId": "CustomerPiiController_read",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/api/privacy/purge": {
+      "post": {
+        "operationId": "CustomerPiiController_purge",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Orders"
         ]
       }
     }

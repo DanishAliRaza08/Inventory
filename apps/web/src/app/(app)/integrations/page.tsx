@@ -5,7 +5,7 @@ import { fetcher } from '@/lib/api';
 import { MARKETPLACE_NAMES, ago } from '@/lib/format';
 
 interface Account { id: string; name: string; marketplace: string; environment: string; status: string; connectedAt: string | null; syncStates: Array<{ resource: string; lastSuccessAt: string | null; lastError: string | null }>; credential: { accessTokenExpiresAt: string | null } | null }
-interface Caps { matrix: Record<string, Record<string, { status: string; api?: string; notes?: string }>> }
+interface Caps { matrix: Record<string, Record<string, { status: string; api?: string; notes?: string }>>; suppliers: Record<string, Record<string, { status: string; api?: string; notes?: string }>> }
 
 export default function IntegrationsPage() {
   const { data: accounts } = useSWR<Account[]>('/integrations/accounts', fetcher);
@@ -27,6 +27,13 @@ export default function IntegrationsPage() {
         <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-xs">
           <thead><tr><th className="th">Operation</th>{caps && Object.keys(caps.matrix).map((m) => <th key={m} className="th">{MARKETPLACE_NAMES[m]}</th>)}</tr></thead>
           <tbody>{ops.map((op) => <tr key={op}><td className="td font-medium">{op.toLowerCase().replace(/_/g, ' ')}</td>{caps && Object.entries(caps.matrix).map(([m, c]) => <td key={m} className="td align-top"><StatusBadge status={c[op]!.status.toUpperCase()} /><div className="mt-1 text-muted">{c[op]!.api}</div>{c[op]!.notes && <div className="text-muted">{c[op]!.notes}</div>}</td>)}</tr>)}</tbody>
+        </table></div>
+      </Card>
+      <Card title="Supplier connectors" className="mt-4">
+        <p className="mb-2 text-sm text-ink2">AliExpress uses the official AliExpress Open Platform dropshipping APIs once the app is approved; until then supplier checks are recorded manually with their source and time. Placing supplier orders always needs staff confirmation.</p>
+        <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-xs">
+          <thead><tr><th className="th">Operation</th>{caps && Object.keys(caps.suppliers).map((k) => <th key={k} className="th">{k.replace('_', ' ')}</th>)}</tr></thead>
+          <tbody>{caps && Object.keys(Object.values(caps.suppliers)[0] ?? {}).map((op) => <tr key={op}><td className="td font-medium">{op.toLowerCase().replace(/_/g, ' ')}</td>{Object.entries(caps.suppliers).map(([k, c]) => <td key={k} className="td align-top"><StatusBadge status={c[op]!.status.toUpperCase()} /><div className="mt-1 text-muted">{c[op]!.api}</div>{c[op]!.notes && <div className="text-muted">{c[op]!.notes}</div>}</td>)}</tr>)}</tbody>
         </table></div>
       </Card>
     </div>

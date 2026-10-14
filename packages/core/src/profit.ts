@@ -2,15 +2,9 @@ import { CostRecord, landedCost } from './costs';
 import { FeeLine, FeeRule, FeeType, estimateFees } from './fees';
 import { FxConversion, FxTable } from './fx';
 import { CurrencyCode, Decimal, DecimalInput, d, money, normaliseCurrency, round2 } from './money';
+import { ResolvedTaxTreatment, TaxTreatment, UkImportTaxRule, resolveUkImportTax } from './tax';
 
-/**
- * How sales tax / VAT on the sale is treated.
- *  - `seller_liable`: the seller is VAT registered and owes the VAT contained in the price.
- *  - `marketplace_collected`: the marketplace collects and remits the tax (deemed supplier / facilitator).
- *  - `not_registered`: the seller is not registered; no tax is separated from revenue.
- * In the first two cases tax is excluded from revenue: VAT is never profit.
- */
-export type TaxTreatment = 'seller_liable' | 'marketplace_collected' | 'not_registered';
+export type { TaxTreatment } from './tax';
 
 export type ProfitStatus = 'estimated' | 'partially_reconciled' | 'confirmed';
 
@@ -35,7 +29,8 @@ export interface OrderLineProfitInput {
   /** Discount funded by the seller (reduces revenue). Marketplace-funded promotions do not. */
   sellerDiscount?: DecimalInput;
   pricesIncludeTax: boolean;
-  taxTreatment: TaxTreatment;
+  /** A fixed treatment, or a rule resolved per line (e.g. UK low-value import rule). */
+  taxTreatment: TaxTreatment | UkImportTaxRule;
   /** Tax rate in percent, used when `taxAmount` is not supplied by the marketplace. */
   taxRatePercent?: DecimalInput;
   /** Actual tax reported by the marketplace for this line, if known. */
@@ -80,6 +75,8 @@ export interface ProfitBreakdown {
   discounts: Decimal;
   grossCharged: Decimal; // what the buyer paid, incl. tax
   taxCollected: Decimal;
+  taxTreatment: TaxTreatment;
+  taxTreatmentReason: string;
   netRevenue: Decimal; // excl. tax, after discounts
   productCost: Decimal; // supplier price x qty (converted)
   supplierShipping: Decimal;
@@ -102,8 +99,8 @@ export interface ProfitBreakdown {
 
 const MARKETPLACE_FEE_TYPES: FeeType[] = ['final_value', 'per_order', 'listing', 'regulatory', 'other'];
 
-function splitTax(gross: Decimal, input: OrderLineProfitInput): Decimal {
-  if (input.taxTreatment === 'not_registered') return new Decimal(0);
+function splitTax(gross: Decimal, input: OrderLineProfitInput, treatment: TaxTreatment): Decimal {
+  if (treatment === 'not_registered') return new Decimal(0);
   const rate = d(input.taxRatePercent);
   if (rate.isZero()) return new Decimal(0);
   return input.pricesIncludeTax ? gross.times(rate).div(rate.plus(100)) : gross.times(rate).div(100);
@@ -122,14 +119,26 @@ export function calculateOrderLineProfit(input: OrderLineProfitInput): ProfitBre
   const discounts = d(input.sellerDiscount);
   const chargedBeforeTax = sellingPrice.plus(customerShipping).minus(discounts);
 
+  let resolved: ResolvedTaxTreatment;
+  if (typeof input.taxTreatment === 'string') {
+    resolved = { treatment: input.taxTreatment, reason: 'Configured tax treatment.' };
+  } else {
+    // Consignment value = goods (excluding shipping and VAT), per the low-value import rule.
+    const goods = sellingPrice.minus(discounts);
+    const rate = d(input.taxRatePercent);
+    const goodsExclVat = input.pricesIncludeTax && !rate.isZero() ? goods.times(100).div(rate.plus(100)) : goods;
+    resolved = resolveUkImportTax(input.taxTreatment, goodsExclVat);
+  }
+  const treatment = resolved.treatment;
+
   let taxCollected: Decimal;
-  if (input.taxTreatment === 'not_registered') {
+  if (treatment === 'not_registered') {
     taxCollected = new Decimal(0);
   } else if (input.taxAmount !== undefined) {
     taxCollected = d(input.taxAmount);
   } else {
-    taxCollected = splitTax(chargedBeforeTax, input);
-    if (d(input.taxRatePercent).isZero() && input.taxTreatment === 'seller_liable') {
+    taxCollected = splitTax(chargedBeforeTax, input, treatment);
+    if (d(input.taxRatePercent).isZero() && treatment === 'seller_liable') {
       warnings.push('Seller is tax-liable but no tax rate or tax amount was supplied; tax assumed to be zero.');
     }
   }
@@ -190,7 +199,7 @@ export function calculateOrderLineProfit(input: OrderLineProfitInput): ProfitBre
   if (input.refund) {
     const refunded = d(input.refund.amountRefunded);
     let refundTax: Decimal;
-    if (input.taxTreatment === 'not_registered') refundTax = new Decimal(0);
+    if (treatment === 'not_registered') refundTax = new Decimal(0);
     else if (input.refund.taxRefunded !== undefined) refundTax = d(input.refund.taxRefunded);
     else refundTax = grossCharged.isZero() ? new Decimal(0) : refunded.times(taxCollected).div(grossCharged);
     const revenueReversed = refunded.minus(refundTax);
@@ -238,6 +247,8 @@ export function calculateOrderLineProfit(input: OrderLineProfitInput): ProfitBre
     discounts: round2(discounts),
     grossCharged: round2(grossCharged),
     taxCollected: round2(taxCollected),
+    taxTreatment: treatment,
+    taxTreatmentReason: resolved.reason,
     netRevenue: r.netRevenue,
     productCost,
     supplierShipping,

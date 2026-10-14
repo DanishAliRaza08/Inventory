@@ -37,16 +37,23 @@ Implementation: `packages/core/src/profit.ts`, `fees.ts`, `costs.ts`, `fx.ts`, `
 | `marketplace_collected` | The marketplace is the deemed supplier / marketplace facilitator and remits the tax | price − tax (tax is never seen as income) |
 | `not_registered` | No tax separated | price |
 
-Defaults (configurable in **Settings → Finance**): UK marketplaces use VAT-inclusive prices with
-`seller_liable` when `finance.vat_registered = true`; US marketplaces use tax-exclusive prices with
-`marketplace_collected`.
+Defaults (configurable in **Settings → Finance**): US marketplaces use tax-exclusive prices with
+`marketplace_collected`. UK marketplaces use VAT-inclusive prices and the **UK low-value import
+rule**, applied automatically per order line (decision October 2026, `finance.auto_low_value_import_vat`):
 
-> **Decision needed from the company's accountant:** under UK rules for online marketplaces,
-> goods located outside the UK at the point of sale in consignments ≤ £135 (typical for
-> AliExpress/CJ dropshipping direct from overseas) are normally treated with the marketplace as
-> the deemed supplier for VAT. Such lines should use `marketplace_collected`. The engine supports
-> this per calculation today; a per-supplier "ships from" setting to apply it automatically is
-> scheduled in Phase 5. The platform does not give tax advice.
+| Goods ship from | Consignment value (goods excl. VAT and shipping, in GBP) | Treatment |
+|---|---|---|
+| Outside the UK (supplier / SKU ships-from country ≠ GB) | ≤ £135 (`finance.low_value_import_threshold_gbp`) | `marketplace_collected` — the marketplace is the deemed supplier and accounts for the VAT |
+| Outside the UK | > £135 | seller's own position (`seller_liable` if VAT registered, else `not_registered`); import VAT applies |
+| UK (own physical stock, or a supplier/SKU marked GB, e.g. a CJ UK warehouse) | any | seller's own position |
+| Unknown (no ships-from country set) | any | seller's own position, with a warning to set the country |
+
+The resolved treatment and the reason are stored on every calculation (`taxTreatment`,
+`taxTreatmentReason`) so VAT reports can separate sales the marketplace accounted for. Because VAT
+is excluded from revenue in both treatments, profit is the same either way for a VAT-registered
+seller; the rule decides **who owes the VAT**. Northern Ireland and EU destinations follow
+different rules and are not covered. This is configurable behaviour, not tax advice — the
+company's accountant remains responsible for the VAT position.
 
 ## 5.3 Formula
 

@@ -38,6 +38,16 @@ docs            Architecture and design documents (start here)
 * **Dashboard:** KPIs with date presets and marketplace filter, sales/profit charts, data
   freshness and completeness warnings.
 
+## Business decisions applied (October 2026)
+
+* **VAT:** the UK low-value import rule is applied automatically per order line from each supplier's
+  ships-from country (overseas goods ≤ £135 → the marketplace accounts for VAT).
+* **eBay:** listings keep being managed the existing way — the eBay connector uses the Trading API,
+  existing Seller Hub listings are adopted, nothing is migrated.
+* **AliExpress:** official AliExpress dropshipping API (needs the approved app's key and secret).
+* **Amazon:** orders are shipped by Fashion Rockstar — buyer data is encrypted, every read audited,
+  and deleted no later than 30 days after delivery.
+
 ## What is not built yet — and is not simulated
 
 Marketplace connectors (OAuth, publishing, orders, fees, settlements) are **Phase 3–5**. Until
@@ -62,7 +72,7 @@ pnpm dev:web   # :3000
 ## Tests
 
 ```bash
-pnpm test:core                         # 58 unit tests (financial, inventory, workflow logic)
+pnpm test:core                         # 65 unit tests (financial, inventory, workflow logic)
 TEST_DATABASE_URL=… pnpm test:api      # integration tests against real PostgreSQL
 pnpm --filter @fr/e2e test:e2e         # browser journey (stack running with DEMO_MODE=true)
 ```

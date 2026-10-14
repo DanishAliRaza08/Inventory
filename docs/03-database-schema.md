@@ -113,8 +113,10 @@ erDiagram
 
 ## 3.6 Data retention (UK GDPR)
 
-* Customer PII is isolated in `order_customers` with `purge_after`; a scheduled job clears PII after
-  the configured retention (`privacy.customer_data_retention_days`, default 730) while keeping the
-  financial record.
+* Customer PII is isolated in `order_customers`, **encrypted field by field** (AES-256-GCM), readable
+  only with `orders.customer_pii`, and every read is audited. An hourly job clears it at
+  `purge_after`: Amazon orders ≤ 30 days after delivery (Amazon Data Protection Policy, capped at
+  30), other marketplaces after `privacy.customer_data_retention_days` (default 90) from delivery.
+  The financial record is kept.
 * Sessions expire (idle 2h, absolute 12h by default) and are revocable.
 * Audit logs are retained for 7 years for financial traceability (configurable), then archived.

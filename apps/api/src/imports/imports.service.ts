@@ -280,8 +280,8 @@ export class ImportsService implements OnModuleInit {
         const currency = d.currency ?? existingSp?.currency ?? supplier.defaultCurrency;
         const sp = await tx.supplierProduct.upsert({
           where: { supplierId_variantId: { supplierId: supplier.id, variantId: variant.id } },
-          update: { currentPrice: price, shippingCost: shipping, currency, url: d.supplier_url ?? undefined, supplierSku: d.supplier_sku ?? undefined, supplierProductId: d.supplier_product_id ?? undefined },
-          create: { supplierId: supplier.id, variantId: variant.id, currentPrice: price, shippingCost: shipping, currency, url: d.supplier_url, supplierSku: d.supplier_sku, supplierProductId: d.supplier_product_id },
+          update: { currentPrice: price, shippingCost: shipping, currency, url: d.supplier_url ?? undefined, supplierSku: d.supplier_sku ?? undefined, supplierProductId: d.supplier_product_id ?? undefined, shipsFromCountry: d.ships_from ?? undefined },
+          create: { supplierId: supplier.id, variantId: variant.id, currentPrice: price, shippingCost: shipping, currency, url: d.supplier_url, supplierSku: d.supplier_sku, supplierProductId: d.supplier_product_id, shipsFromCountry: d.ships_from },
         });
         if (!existingSp || !existingSp.currentPrice.equals(sp.currentPrice) || !existingSp.shippingCost.equals(sp.shippingCost) || existingSp.currency !== sp.currency) {
           await tx.supplierPriceHistory.create({ data: { supplierProductId: sp.id, price: sp.currentPrice, shippingCost: sp.shippingCost, currency: sp.currency, source: `import:${jobId}`, recordedById: actor.userId } });
@@ -402,7 +402,7 @@ export class ImportsService implements OnModuleInit {
     const example: Record<string, unknown> = {
       product_id: '', parent_sku: 'FR-10001', sku: 'FR-10001-BLU-12', title: "Women's Floral Midi Dress", description: 'Lightweight floral midi dress.',
       category: 'Dresses', brand: '', barcode: '', size: '12', colour: 'Blue', material: 'Polyester', weight_g: 250, supplier: 'CJ Dropshipping',
-      supplier_url: 'https://example.com/supplier/product/123', supplier_sku: 'CJ-123-BLU-12', supplier_product_id: '123', cost: '6.50', supplier_shipping: '2.10',
+      supplier_url: 'https://example.com/supplier/product/123', supplier_sku: 'CJ-123-BLU-12', supplier_product_id: '123', ships_from: 'CN', cost: '6.50', supplier_shipping: '2.10',
       packaging: '0.20', currency: 'USD', fulfilment_model: 'DROPSHIP', stock: 120, safety_stock: '', selling_price: '24.99', marketplace: 'EBAY_UK', marketplace_sku: '',
     };
     return writeTable(format, IMPORT_TEMPLATE_HEADERS, [example], 'Products');

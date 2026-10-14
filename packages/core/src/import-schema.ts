@@ -24,6 +24,7 @@ export const IMPORT_FIELDS = {
   supplier_url: { label: 'Supplier URL', required: false, synonyms: ['supplier url', 'supplier link', 'source url', 'url'] },
   supplier_sku: { label: 'Supplier SKU', required: false, synonyms: ['supplier sku', 'vendor sku'] },
   supplier_product_id: { label: 'Supplier product ID', required: false, synonyms: ['supplier product id', 'source id'] },
+  ships_from: { label: 'Ships from country (ISO, e.g. CN, GB)', required: false, synonyms: ['ships from', 'ship from', 'origin', 'warehouse country', 'ships from country'] },
   cost: { label: 'Supplier unit cost', required: false, synonyms: ['cost', 'unit cost', 'supplier price', 'purchase price', 'buy price'] },
   supplier_shipping: { label: 'Supplier shipping per unit', required: false, synonyms: ['shipping', 'supplier shipping', 'shipping cost'] },
   packaging: { label: 'Packaging per unit', required: false, synonyms: ['packaging', 'packaging cost'] },
@@ -94,6 +95,7 @@ export const ImportRowSchema = z
     supplier_url: z.preprocess(blankToUndef, z.string().url('Supplier URL must be a valid URL').optional()),
     supplier_sku: str(120),
     supplier_product_id: str(120),
+    ships_from: z.preprocess((v) => (typeof blankToUndef(v) === 'string' ? (v as string).trim().toUpperCase() : blankToUndef(v)), z.string().regex(/^[A-Z]{2}$/, 'Ships-from must be a 2-letter country code').optional()),
     cost: money,
     supplier_shipping: money,
     packaging: money,
@@ -106,6 +108,7 @@ export const ImportRowSchema = z
     marketplace_sku: str(64),
   })
   .superRefine((row, ctx) => {
+    if (row.ships_from && !row.supplier) ctx.addIssue({ code: 'custom', path: ['supplier'], message: 'Supplier is required when ships-from is given' });
     if (row.cost !== undefined && !row.currency) ctx.addIssue({ code: 'custom', path: ['currency'], message: 'Currency is required when a cost is given' });
     if (row.selling_price !== undefined && !row.marketplace) ctx.addIssue({ code: 'custom', path: ['marketplace'], message: 'Marketplace is required when a selling price is given' });
     if (row.marketplace_sku && !row.marketplace) ctx.addIssue({ code: 'custom', path: ['marketplace'], message: 'Marketplace is required when a marketplace SKU is given' });
@@ -147,6 +150,6 @@ export function findDuplicateRows(rows: RowValidation[]): Map<number, string> {
 
 export const IMPORT_TEMPLATE_HEADERS: ImportField[] = [
   'product_id', 'parent_sku', 'sku', 'title', 'description', 'category', 'brand', 'barcode', 'size', 'colour', 'material', 'weight_g',
-  'supplier', 'supplier_url', 'supplier_sku', 'supplier_product_id', 'cost', 'supplier_shipping', 'packaging', 'currency',
+  'supplier', 'supplier_url', 'supplier_sku', 'supplier_product_id', 'ships_from', 'cost', 'supplier_shipping', 'packaging', 'currency',
   'fulfilment_model', 'stock', 'safety_stock', 'selling_price', 'marketplace', 'marketplace_sku',
 ];

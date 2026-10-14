@@ -241,6 +241,8 @@ model Supplier {
   email             String?
   phone             String?
   defaultCurrency   String       @default("USD") @map("default_currency") @db.Char(3)
+  /// ISO country the supplier normally ships from (drives the UK low-value import VAT rule).
+  shipsFromCountry  String?      @map("ships_from_country") @db.Char(2)
   processingDays    Int?         @map("processing_days")
   deliveryDaysMin   Int?         @map("delivery_days_min")
   deliveryDaysMax   Int?         @map("delivery_days_max")
@@ -273,6 +275,8 @@ model SupplierProduct {
   currentPrice       Decimal             @map("current_price") @db.Decimal(14, 4)
   shippingCost       Decimal             @default(0) @map("shipping_cost") @db.Decimal(14, 4)
   currency           String              @db.Char(3)
+  /// Overrides the supplier's ships-from country for this SKU (e.g. CJ UK warehouse).
+  shipsFromCountry   String?             @map("ships_from_country") @db.Char(2)
   processingDays     Int?                @map("processing_days")
   deliveryDaysMin    Int?                @map("delivery_days_min")
   deliveryDaysMax    Int?                @map("delivery_days_max")

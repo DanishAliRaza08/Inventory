@@ -97,7 +97,7 @@ export class ImportsController {
         product_id: `FRP-${String(v.product.productNumber).padStart(6, '0')}`,
         parent_sku: '', sku: v.sku, title: v.title ?? v.product.title, description: v.product.description, category: v.product.category ?? '', brand: v.product.brand ?? '',
         barcode: v.barcode ?? '', size: v.size ?? '', colour: v.colour ?? '', material: v.material ?? '', weight_g: v.weightGrams ?? '',
-        supplier: sp?.supplier.name ?? '', supplier_url: sp?.url ?? '', supplier_sku: sp?.supplierSku ?? '', supplier_product_id: sp?.supplierProductId ?? '',
+        supplier: sp?.supplier.name ?? '', supplier_url: sp?.url ?? '', supplier_sku: sp?.supplierSku ?? '', supplier_product_id: sp?.supplierProductId ?? '', ships_from: sp?.shipsFromCountry ?? '',
         cost: c?.supplierPrice.toFixed(2) ?? '', supplier_shipping: c?.supplierShipping.toFixed(2) ?? '', packaging: c?.packaging.toFixed(2) ?? '', currency: c?.currency ?? '',
         fulfilment_model: v.product.fulfilmentModel,
         stock: v.product.fulfilmentModel === 'PHYSICAL' ? v.inventory[0]?.available ?? 0 : sp?.reportedQuantity ?? '',

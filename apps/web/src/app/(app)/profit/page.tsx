@@ -6,7 +6,7 @@ import { api, fetcher } from '@/lib/api';
 import { MARKETPLACE_CURRENCY, MARKETPLACE_NAMES, money, pct } from '@/lib/format';
 
 type B = Record<string, string | null> & { status: string; currency: string; warnings: string[]; feeLines: Array<{ name: string; amount: string; explanation: string; source: string }>; fxConversions: Array<{ from: string; to: string; rate: string; asOf: string; source: string }>; reporting?: { currency: string; netProfit: string; rate: string } };
-interface CalcResult { breakdown: B; alerts: Array<{ code: string; severity: string; message: string }>; minimumProfitablePrice: string | null; assumptions: { tax: { taxTreatment: string; taxRatePercent: string; pricesIncludeTax: boolean } } }
+interface CalcResult { breakdown: B; alerts: Array<{ code: string; severity: string; message: string }>; minimumProfitablePrice: string | null; assumptions: { tax: { taxTreatment: string; taxTreatmentReason: string; taxRatePercent: string; pricesIncludeTax: boolean } } }
 
 const ROWS: Array<[string, string, boolean?]> = [
   ['sellingPrice', 'Selling price'], ['customerShipping', 'Customer shipping revenue'], ['discounts', 'Discounts (seller-funded)', true], ['taxCollected', 'Tax collected (not revenue)', true],
@@ -22,6 +22,7 @@ export default function ProfitPage() {
   const { data: found } = useSWR<{ variants: Array<{ id: string; sku: string; product: { title: string } }> }>(mode === 'sku' && skuQ.length >= 2 && !variant ? `/search?q=${encodeURIComponent(skuQ)}` : null, fetcher);
   const [f, setF] = useState({ marketplace: 'EBAY_UK', unitPrice: '24.99', quantity: '1', shippingCharged: '0', sellerDiscount: '0', fulfilmentCost: '0', advertisingCost: '0', otherExpenses: '0', categoryId: '' });
   const [cost, setCost] = useState({ currency: 'USD', supplierPrice: '6.50', supplierShipping: '2.10', packaging: '0.25' });
+  const [shipsFrom, setShipsFrom] = useState('CN');
   const [target, setTarget] = useState({ kind: 'margin', value: '25' });
   const [res, setRes] = useState<CalcResult | null>(null);
   const [rev, setRev] = useState<{ achievable: boolean; unitPrice: string | null; message: string; breakdown: B | null } | null>(null);
@@ -33,7 +34,7 @@ export default function ProfitPage() {
   const base = () => ({
     marketplace: f.marketplace, quantity: Number(f.quantity), shippingCharged: f.shippingCharged, sellerDiscount: f.sellerDiscount, fulfilmentCost: f.fulfilmentCost,
     advertisingCost: f.advertisingCost, otherExpenses: f.otherExpenses, categoryId: f.categoryId || undefined,
-    ...(mode === 'sku' ? { variantId: variant?.id } : { cost }),
+    ...(mode === 'sku' ? { variantId: variant?.id } : { cost, shipsFromCountry: shipsFrom || null }),
   });
   const calc = async () => { setError(null); try { setRes(await api.post<CalcResult>('/profit/calculate', { ...base(), unitPrice: f.unitPrice })); } catch (e) { setError(e); } };
   const reverse = async () => {
@@ -66,6 +67,7 @@ export default function ProfitPage() {
                 <Field label="Supplier price"><input className="input" value={cost.supplierPrice} onChange={(e) => setCost({ ...cost, supplierPrice: e.target.value })} /></Field>
                 <Field label="Supplier shipping"><input className="input" value={cost.supplierShipping} onChange={(e) => setCost({ ...cost, supplierShipping: e.target.value })} /></Field>
                 <Field label="Packaging"><input className="input" value={cost.packaging} onChange={(e) => setCost({ ...cost, packaging: e.target.value })} /></Field>
+                <Field label="Ships from (country)"><input className="input" maxLength={2} value={shipsFrom} onChange={(e) => setShipsFrom(e.target.value.toUpperCase())} /></Field>
               </div>
             )}
             <Field label="Marketplace"><select className="input" value={f.marketplace} onChange={(e) => setF({ ...f, marketplace: e.target.value })}>{Object.entries(MARKETPLACE_NAMES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
@@ -103,7 +105,7 @@ export default function ProfitPage() {
                 <p><strong>Minimum profitable price:</strong> {money(res!.minimumProfitablePrice, b.currency)}</p>
                 <div><strong>Fees</strong><ul className="text-xs text-ink2">{b.feeLines.map((fl, i) => <li key={i}>{fl.name}: {money(fl.amount, b.currency)} — {fl.explanation} ({fl.source})</li>)}</ul></div>
                 {b.fxConversions.length > 0 && <div><strong>Exchange rates used</strong><ul className="text-xs text-ink2">{b.fxConversions.map((x, i) => <li key={i}>1 {x.from} = {Number(x.rate).toFixed(4)} {x.to} ({x.source}, {new Date(x.asOf).toLocaleDateString('en-GB')})</li>)}</ul></div>}
-                <p className="text-xs text-muted">Tax: {res!.assumptions.tax.taxTreatment.replace('_', ' ')}, {res!.assumptions.tax.taxRatePercent}% {res!.assumptions.tax.pricesIncludeTax ? '(prices include tax)' : '(prices exclude tax)'}</p>
+                <div className="text-xs text-ink2"><strong>VAT:</strong> {res!.assumptions.tax.taxTreatment.replace(/_/g, ' ')} at {res!.assumptions.tax.taxRatePercent}% {res!.assumptions.tax.pricesIncludeTax ? '(prices include VAT)' : '(prices exclude tax)'}<div className="text-muted">{res!.assumptions.tax.taxTreatmentReason}</div></div>
               </div>
             </div>
           )}

@@ -68,4 +68,35 @@ describe('profit calculator API', () => {
     expect(e.status).toBe(201);
     expect((await (await t.as('listing_manager')).get('/api/expenses')).status).toBe(403);
   });
+
+  it('applies the UK low-value import VAT rule automatically from the supplier origin', async () => {
+    const owner = await t.as('owner');
+    const calc = async (variantId: string, unitPrice = '24.00') =>
+      (await owner.post('/api/profit/calculate', { marketplace: 'EBAY_UK', variantId, unitPrice })).body.assumptions.tax;
+
+    // Overseas supplier, £20 goods excl. VAT -> marketplace is the deemed supplier.
+    const cn = await owner.post('/api/suppliers', { name: 'AliExpress CN', type: 'ALIEXPRESS', shipsFromCountry: 'cn' });
+    expect(cn.body.shipsFromCountry).toBe('CN');
+    const p = await createProduct(owner);
+    const sp = await owner.post(`/api/variants/${p.variants[0].id}/suppliers`, { supplierId: cn.body.id, currentPrice: '8', currency: 'GBP' });
+    const t1 = await calc(p.variants[0].id);
+    expect(t1.taxTreatment).toBe('marketplace_collected');
+    expect(t1.taxTreatmentReason).toMatch(/CN/);
+    // Above £135 excl. VAT the seller accounts for VAT.
+    expect((await calc(p.variants[0].id, '200.00')).taxTreatment).toBe('seller_liable');
+
+    // A UK-warehouse override on the supplier SKU, and physical stock, are UK sales.
+    await t.prisma.supplierProduct.update({ where: { id: sp.body.id }, data: { shipsFromCountry: 'GB' } });
+    expect((await calc(p.variants[0].id)).taxTreatment).toBe('seller_liable');
+    const phys = await createProduct(owner, { fulfilmentModel: 'PHYSICAL', variants: [{ sku: 'VAT-PHYS', initialCost: { currency: 'GBP', supplierPrice: '8' } }] });
+    expect((await calc(phys.variants[0].id)).taxTreatment).toBe('seller_liable');
+
+    // Unknown origin is flagged; the rule can be switched off in settings.
+    const unknown = await createProduct(owner);
+    expect((await calc(unknown.variants[0].id)).taxTreatmentReason).toMatch(/unknown/);
+    await owner.put('/api/settings/finance.auto_low_value_import_vat', { value: false });
+    await t.prisma.supplierProduct.update({ where: { id: sp.body.id }, data: { shipsFromCountry: 'CN' } });
+    expect((await calc(p.variants[0].id)).taxTreatment).toBe('seller_liable');
+    await owner.put('/api/settings/finance.auto_low_value_import_vat', { value: true });
+  });
 });

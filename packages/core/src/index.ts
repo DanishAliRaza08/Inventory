@@ -3,6 +3,7 @@ export * from './fx';
 export * from './marketplaces';
 export * from './fees';
 export * from './costs';
+export * from './tax';
 export * from './profit';
 export * from './pricing';
 export * from './permissions';

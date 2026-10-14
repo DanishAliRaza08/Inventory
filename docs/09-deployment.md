@@ -70,3 +70,14 @@ Key rotation: add the new key as version 2, re-encrypt credentials in a backgrou
 * Access is role-based and audited; staff accounts are individual; MFA for privileged roles.
 * Subject access / erasure requests: find by order or email, export, then purge PII while keeping
   the anonymised financial record required for accounting.
+
+## Security incident response
+
+1. **Contain:** use the emergency controls, revoke affected sessions (`Users → Disable`), rotate
+   exposed credentials (marketplace tokens, `APP_ENCRYPTION_KEY` via key versioning).
+2. **Assess:** use the audit log (`customer_pii.read`, `auth.*`, `integration.*`) to establish what
+   data and which customers were affected.
+3. **Notify:** incidents involving Amazon customer data must be reported to Amazon (security@amazon.com)
+   **within 24 hours** of detection; personal-data breaches likely to risk individuals must be
+   reported to the ICO within 72 hours; affected marketplaces per their policies.
+4. **Recover & review:** restore from backups if needed, then write a post-incident review.

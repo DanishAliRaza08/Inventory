@@ -9,6 +9,7 @@ import { config } from '../config';
 import { zMarketplace } from '../finance/finance.schemas';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConnectorRegistry } from './connector-registry';
+import { SUPPLIER_CONNECTORS } from './supplier-connectors';
 
 const AccountInput = z.object({
   marketplace: zMarketplace,
@@ -55,6 +56,10 @@ export class AccountsController {
 
   @Get('capabilities')
   capabilities() {
-    return { marketplaces: MARKETPLACES, matrix: this.registry.capabilityMatrix() };
+    return {
+      marketplaces: MARKETPLACES,
+      matrix: this.registry.capabilityMatrix(),
+      suppliers: Object.fromEntries(Object.entries(SUPPLIER_CONNECTORS).map(([k, c]) => [k, c.capabilities])),
+    };
   }
 }

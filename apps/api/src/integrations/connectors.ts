@@ -25,20 +25,28 @@ abstract class OfficialConnector implements MarketplaceConnector {
   }
 }
 
+/**
+ * Decision (Oct 2026): Fashion Rockstar keeps managing eBay listings the existing way, so
+ * listing operations use the **Trading API**. Listings stay editable in Seller Hub, existing
+ * listings are adopted without migration, and nothing is moved to the Inventory API (whose
+ * listings can no longer be edited in Seller Hub). REST APIs are used where they do not
+ * affect how listings are managed (taxonomy, business policies, orders, finances).
+ */
 const ebayCaps = caps({
-  CONNECT_ACCOUNT: { status: 'planned', api: 'OAuth 2.0 authorization code grant (user token) + refresh token' },
-  FETCH_CATEGORIES: { status: 'planned', api: 'Commerce Taxonomy API getCategoryTree / getCategorySuggestions' },
+  CONNECT_ACCOUNT: { status: 'planned', api: 'OAuth 2.0 authorization code grant (user token + refresh token); the same token authorises Trading API calls', notes: 'Requires eBay developer program production keyset; subscribe to marketplace account deletion notifications' },
+  FETCH_CATEGORIES: { status: 'planned', api: 'Commerce Taxonomy API getCategoryTree / getCategorySuggestions (EBAY_GB / EBAY_US)' },
   FETCH_CATEGORY_ATTRIBUTES: { status: 'planned', api: 'Commerce Taxonomy API getItemAspectsForCategory' },
-  CREATE_LISTING: { status: 'planned', api: 'Sell Inventory API createOrReplaceInventoryItem → createOffer → publishOffer' },
-  REVISE_LISTING: { status: 'planned', api: 'Sell Inventory API createOrReplaceInventoryItem / updateOffer' },
-  UPDATE_PRICE_QUANTITY: { status: 'planned', api: 'Sell Inventory API bulkUpdatePriceQuantity' },
-  PAUSE_LISTING: { status: 'planned', api: 'Set available quantity to 0 (out-of-stock control) via bulkUpdatePriceQuantity', notes: 'eBay has no "pause" state for fixed-price listings.' },
-  END_LISTING: { status: 'planned', api: 'Sell Inventory API withdrawOffer' },
-  GET_LISTING_STATUS: { status: 'planned', api: 'Sell Inventory API getOffer / getOffers' },
+  ADOPT_EXISTING_LISTINGS: { status: 'planned', api: 'Trading API GetSellerList / GetMyeBaySelling + GetItem', notes: 'Imports existing Seller Hub listings as ACTIVE (confirmed by eBay) and links them to master SKUs by Custom Label (SKU); no migration' },
+  CREATE_LISTING: { status: 'planned', api: 'Trading API VerifyAddFixedPriceItem → AddFixedPriceItem', notes: 'Verify call used as the pre-publication check; SKU in the Custom Label; business policies by profile id' },
+  REVISE_LISTING: { status: 'planned', api: 'Trading API ReviseFixedPriceItem' },
+  UPDATE_PRICE_QUANTITY: { status: 'planned', api: 'Trading API ReviseInventoryStatus (up to 4 items per call)' },
+  PAUSE_LISTING: { status: 'planned', api: 'Trading API ReviseInventoryStatus quantity 0 (with out-of-stock control enabled)', notes: 'eBay fixed-price listings have no "pause" state' },
+  END_LISTING: { status: 'planned', api: 'Trading API EndFixedPriceItem' },
+  GET_LISTING_STATUS: { status: 'planned', api: 'Trading API GetItem' },
   FETCH_ORDERS: { status: 'planned', api: 'Sell Fulfillment API getOrders' },
   PUSH_TRACKING: { status: 'planned', api: 'Sell Fulfillment API createShippingFulfillment' },
-  FETCH_RETURNS: { status: 'planned', api: 'Post-Order API (returns)', notes: 'Verify availability for the account before enabling.' },
-  FETCH_FEES: { status: 'planned', api: 'Sell Finances API getTransactions' },
+  FETCH_RETURNS: { status: 'planned', api: 'Post-Order API (returns, cancellations)', notes: 'Verify availability for the UK/US accounts' },
+  FETCH_FEES: { status: 'planned', api: 'Sell Finances API getTransactions', notes: 'Digital signatures required for UK/EU sellers' },
   FETCH_SETTLEMENTS: { status: 'planned', api: 'Sell Finances API getPayouts' },
 });
 
@@ -55,17 +63,18 @@ export class EbayUsConnector extends OfficialConnector {
 export class AmazonUkConnector extends OfficialConnector {
   readonly marketplace = 'AMAZON_UK' as const;
   readonly capabilities = caps({
-    CONNECT_ACCOUNT: { status: 'planned', api: 'Selling Partner API authorisation (LWA OAuth) with the required roles' },
+    CONNECT_ACCOUNT: { status: 'planned', api: 'Selling Partner API authorisation (LWA OAuth) with roles: Product Listing, Pricing, Inventory and Order Tracking, Direct-to-Consumer Shipping (restricted), Finance and Accounting' },
     FETCH_CATEGORIES: { status: 'planned', api: 'Product Type Definitions API searchDefinitionsProductTypes' },
     FETCH_CATEGORY_ATTRIBUTES: { status: 'planned', api: 'Product Type Definitions API getDefinitionsProductType (JSON schema)' },
+    ADOPT_EXISTING_LISTINGS: { status: 'planned', api: 'Reports API GET_MERCHANT_LISTINGS_ALL_DATA + Listings Items API getListingsItem', notes: 'Links existing offers to master SKUs by seller SKU' },
     CREATE_LISTING: { status: 'planned', api: 'Listings Items API putListingsItem (validation preview supported)', notes: 'Drafts live only in this platform; Amazon has no hosted draft for listings items.' },
     REVISE_LISTING: { status: 'planned', api: 'Listings Items API patchListingsItem' },
     UPDATE_PRICE_QUANTITY: { status: 'planned', api: 'Listings Items API patchListingsItem (purchasable_offer, fulfillment_availability)' },
     PAUSE_LISTING: { status: 'planned', api: 'Set fulfillment_availability quantity to 0' },
     END_LISTING: { status: 'planned', api: 'Listings Items API deleteListingsItem' },
     GET_LISTING_STATUS: { status: 'planned', api: 'Listings Items API getListingsItem (issues, status)' },
-    FETCH_ORDERS: { status: 'planned', api: 'Orders API getOrders / getOrderItems (PII requires restricted data token)' },
-    PUSH_TRACKING: { status: 'planned', api: 'Feeds API order fulfillment feed / Merchant Fulfillment', notes: 'Choose per account setup.' },
+    FETCH_ORDERS: { status: 'planned', api: 'Orders API getOrders / getOrderItems; buyer address via Restricted Data Token (Tokens API)', notes: 'Self-fulfilled (merchant-fulfilled) orders: requires the restricted Direct-to-Consumer Shipping role; PII encrypted, access audited, deleted ≤ 30 days after delivery' },
+    PUSH_TRACKING: { status: 'planned', api: 'Orders API confirmShipment', notes: 'Merchant-fulfilled: carrier + tracking confirmed after dispatch' },
     FETCH_RETURNS: { status: 'planned', api: 'Reports API returns reports' },
     FETCH_FEES: { status: 'planned', api: 'Finances API listFinancialEvents' },
     FETCH_SETTLEMENTS: { status: 'planned', api: 'Reports API settlement reports' },
@@ -78,6 +87,7 @@ export class TikTokUkConnector extends OfficialConnector {
     CONNECT_ACCOUNT: { status: 'planned', api: 'TikTok Shop Partner Center app authorisation (OAuth) for the UK shop' },
     FETCH_CATEGORIES: { status: 'planned', api: 'Product API get categories' },
     FETCH_CATEGORY_ATTRIBUTES: { status: 'planned', api: 'Product API get attributes / category rules' },
+    ADOPT_EXISTING_LISTINGS: { status: 'planned', api: 'Product API search products + get product', notes: 'Links existing products to master SKUs by seller SKU' },
     CREATE_LISTING: { status: 'planned', api: 'Product API create product (requires images uploaded via upload image)' },
     REVISE_LISTING: { status: 'planned', api: 'Product API edit / partial edit product' },
     UPDATE_PRICE_QUANTITY: { status: 'planned', api: 'Product API update price / update inventory' },

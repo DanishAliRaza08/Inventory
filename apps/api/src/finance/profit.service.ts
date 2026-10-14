@@ -8,6 +8,7 @@ import {
   MarketplaceCode,
   OrderLineProfitInput,
   TaxTreatment,
+  UkImportTaxRule,
   breakEvenPrice,
   calculateOrderLineProfit,
   profitAlerts,
@@ -65,13 +66,37 @@ export class ProfitService {
    * VAT-registered seller is liable; US marketplaces collect sales tax as marketplace
    * facilitators and prices are shown before tax. Overridable per calculation.
    */
-  async taxDefaults(marketplace: MarketplaceCode) {
+  async taxDefaults(marketplace: MarketplaceCode, origin: { variantId?: string; shipsFromCountry?: string | null } = {}) {
     const vatRegistered = await this.settings.get('finance.vat_registered');
     const rate = await this.settings.get('finance.default_vat_rate_percent');
     if (MARKETPLACES[marketplace].country === 'US') {
-      return { pricesIncludeTax: false, taxTreatment: 'marketplace_collected' as TaxTreatment, taxRatePercent: '0' };
+      return { pricesIncludeTax: false, taxTreatment: 'marketplace_collected' as TaxTreatment | UkImportTaxRule, taxRatePercent: '0' };
     }
-    return { pricesIncludeTax: true, taxTreatment: (vatRegistered ? 'seller_liable' : 'not_registered') as TaxTreatment, taxRatePercent: vatRegistered ? rate : '0' };
+    const own: TaxTreatment = vatRegistered ? 'seller_liable' : 'not_registered';
+    // VAT is charged at the standard rate on UK sales whether the seller or the marketplace accounts for it.
+    const base = { pricesIncludeTax: true, taxRatePercent: rate };
+    if (!(await this.settings.get('finance.auto_low_value_import_vat'))) return { ...base, taxRatePercent: vatRegistered ? rate : '0', taxTreatment: own as TaxTreatment | UkImportTaxRule };
+    const shipsFrom = origin.shipsFromCountry !== undefined ? origin.shipsFromCountry : origin.variantId ? await this.shipsFromForVariant(origin.variantId) : null;
+    const rule: UkImportTaxRule = {
+      kind: 'uk_low_value_import',
+      shipsFromCountry: shipsFrom,
+      sellerVatRegistered: vatRegistered,
+      thresholdGbp: await this.settings.get('finance.low_value_import_threshold_gbp'),
+      saleToGbpRate: 1, // UK marketplaces sell in GBP
+    };
+    return { ...base, taxTreatment: rule as TaxTreatment | UkImportTaxRule };
+  }
+
+  /** Where the goods physically ship from: own stock = GB; dropship = primary supplier's origin. */
+  async shipsFromForVariant(variantId: string): Promise<string | null> {
+    const v = await this.prisma.productVariant.findUnique({
+      where: { id: variantId },
+      select: { product: { select: { fulfilmentModel: true } }, supplierProducts: { orderBy: { priority: 'asc' }, take: 1, select: { shipsFromCountry: true, supplier: { select: { shipsFromCountry: true } } } } },
+    });
+    if (!v) return null;
+    if (v.product.fulfilmentModel === 'PHYSICAL') return 'GB';
+    const sp = v.supplierProducts[0];
+    return sp?.shipsFromCountry ?? sp?.supplier.shipsFromCountry ?? null;
   }
 
   private async resolveCost(input: Pick<CalcInput, 'variantId' | 'cost'>): Promise<CostRecord & { id?: string }> {
@@ -96,7 +121,7 @@ export class ProfitService {
 
   private async buildBase(input: Omit<CalcInput, 'unitPrice'>): Promise<Omit<OrderLineProfitInput, 'unitPrice'>> {
     const mp = input.marketplace as MarketplaceCode;
-    const tax = await this.taxDefaults(mp);
+    const tax = await this.taxDefaults(mp, { variantId: input.variantId, shipsFromCountry: input.variantId ? undefined : input.shipsFromCountry ?? null });
     return {
       marketplace: mp,
       categoryId: input.categoryId,
@@ -127,7 +152,10 @@ export class ProfitService {
       breakdown,
       alerts: profitAlerts(breakdown, thresholds),
       minimumProfitablePrice: breakEven.achievable ? breakEven.unitPrice : null,
-      assumptions: { tax: { pricesIncludeTax: base.pricesIncludeTax, taxTreatment: base.taxTreatment, taxRatePercent: base.taxRatePercent }, feeRuleCount: base.feeRules?.length ?? 0 },
+      assumptions: {
+        tax: { pricesIncludeTax: base.pricesIncludeTax, taxTreatment: breakdown.taxTreatment, taxTreatmentReason: breakdown.taxTreatmentReason, taxRatePercent: base.taxRatePercent },
+        feeRuleCount: base.feeRules?.length ?? 0,
+      },
     };
   }
 

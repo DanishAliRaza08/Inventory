@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { AuditService } from '../audit/audit.service';
 import type { AuthContext } from '../auth/decorators';
 import { zCurrency, zMoneyNonNeg } from '../common/zod';
+import { zCountry } from '../finance/finance.schemas';
 import { CostsService } from '../costs/costs.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -15,6 +16,8 @@ export const SupplierInput = z.object({
   email: z.string().email().optional(),
   phone: z.string().max(40).optional(),
   defaultCurrency: zCurrency.default('USD'),
+  /** Where this supplier normally ships from, e.g. CN for AliExpress sellers. */
+  shipsFromCountry: zCountry.optional(),
   processingDays: z.number().int().nonnegative().optional(),
   deliveryDaysMin: z.number().int().nonnegative().optional(),
   deliveryDaysMax: z.number().int().nonnegative().optional(),
@@ -31,6 +34,7 @@ export const SupplierProductInput = z.object({
   currentPrice: zMoneyNonNeg,
   shippingCost: zMoneyNonNeg.default('0'),
   currency: zCurrency,
+  shipsFromCountry: zCountry.optional(),
   processingDays: z.number().int().nonnegative().optional(),
   deliveryDaysMin: z.number().int().nonnegative().optional(),
   deliveryDaysMax: z.number().int().nonnegative().optional(),

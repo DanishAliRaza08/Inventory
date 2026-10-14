@@ -2,6 +2,8 @@ import { FEE_BASES, FEE_TYPES, MARKETPLACE_CODES } from '@fr/core';
 import { z } from 'zod';
 import { zCurrency, zMoney, zMoneyNonNeg } from '../common/zod';
 
+export const zCountry = z.string().trim().toUpperCase().pipe(z.string().regex(/^[A-Z]{2}$/, 'Must be a 2-letter ISO country code'));
+
 export const zMarketplace = z.enum(MARKETPLACE_CODES as ['EBAY_UK', 'EBAY_US', 'AMAZON_UK', 'TIKTOK_UK']);
 
 export const FxRateInput = z.object({
@@ -61,6 +63,8 @@ export const CalculateInput = z
     taxTreatment: z.enum(['seller_liable', 'marketplace_collected', 'not_registered']).optional(),
     taxRatePercent: zMoneyNonNeg.optional(),
     pricesIncludeTax: z.boolean().optional(),
+    /** For manual-cost calculations: where the goods ship from (ISO country), for the UK import VAT rule. */
+    shipsFromCountry: zCountry.nullable().optional(),
     reportingCurrency: zCurrency.optional(),
   })
   .refine((v) => v.variantId || v.cost, { message: 'Provide a variantId or cost fields', path: ['cost'] });

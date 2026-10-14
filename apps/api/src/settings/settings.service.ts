@@ -24,7 +24,13 @@ export const SETTINGS_SCHEMA = {
   'finance.reporting_currency': z.string().regex(/^[A-Z]{3}$/),
   'finance.vat_registered': z.boolean(),
   'finance.default_vat_rate_percent': z.string().regex(/^\d+(\.\d{1,2})?$/),
-  'privacy.customer_data_retention_days': z.number().int().positive(),
+  /** Apply the UK low-value import rule (marketplace accounts for VAT) automatically per supplier origin. */
+  'finance.auto_low_value_import_vat': z.boolean(),
+  'finance.low_value_import_threshold_gbp': z.string().regex(/^\d+(\.\d{1,2})?$/),
+  /** Days after delivery that customer contact details are kept (non-Amazon orders). */
+  'privacy.customer_data_retention_days': z.number().int().positive().max(730),
+  /** Amazon's Data Protection Policy: delete PII no later than 30 days after delivery. */
+  'privacy.amazon_pii_retention_days_after_delivery': z.number().int().min(1).max(30),
 } as const;
 
 export type SettingKey = keyof typeof SETTINGS_SCHEMA;
@@ -45,7 +51,10 @@ export const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
   'finance.reporting_currency': 'GBP',
   'finance.vat_registered': true,
   'finance.default_vat_rate_percent': '20',
-  'privacy.customer_data_retention_days': 730,
+  'finance.auto_low_value_import_vat': true,
+  'finance.low_value_import_threshold_gbp': '135',
+  'privacy.customer_data_retention_days': 90,
+  'privacy.amazon_pii_retention_days_after_delivery': 30,
 };
 
 @Injectable()

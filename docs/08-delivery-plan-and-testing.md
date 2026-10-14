@@ -19,8 +19,8 @@ production behind the emergency controls.
 
 | Layer | Tool | What it proves | Where |
 |---|---|---|---|
-| Unit | Vitest | Profit engine (demo example, VAT, refunds, FX, actual-vs-estimated fees, rounding), fee rules (tiers, caps, overrides, dates), reverse pricing to the penny, listing state machine & guards, listing validation, physical/dropship availability, sync planning, import row validation | `packages/core/test` — **58 tests** |
-| Integration | Vitest + Supertest against **real PostgreSQL** (migrations applied, DB truncated per file) | Auth/MFA/lockout/CSRF/permissions; catalogue & SKU uniqueness; cost history and DB constraints; supplier price → history + cost + alert; idempotent and concurrent stock movements (no overselling); profit API incl. FX refusal; full listing lifecycle through the job processor; failures, retries, kill switch, bulk preview tokens; 5,300-row import; exports | `apps/api/test` — **45 tests** |
+| Unit | Vitest | Profit engine (demo example, VAT, refunds, FX, actual-vs-estimated fees, rounding), fee rules (tiers, caps, overrides, dates), reverse pricing to the penny, listing state machine & guards, listing validation, physical/dropship availability, sync planning, import row validation | `packages/core/test` — **65 tests** |
+| Integration | Vitest + Supertest against **real PostgreSQL** (migrations applied, DB truncated per file) | Auth/MFA/lockout/CSRF/permissions; catalogue & SKU uniqueness; cost history and DB constraints; supplier price → history + cost + alert; idempotent and concurrent stock movements (no overselling); profit API incl. FX refusal; full listing lifecycle through the job processor; failures, retries, kill switch, bulk preview tokens; 5,300-row import; exports | `apps/api/test` — **51 tests** |
 | End-to-end | Playwright (Chromium) against running API + web with demo seed | Sign-in redirect, dashboard warnings, product creation → image upload → draft → second-user approval → publish (demo connector) → Active, profit demo example, integrations honesty, phone-width layout | `e2e/tests` — **6 tests** |
 | Connector contract (Phase 3) | Recorded sandbox fixtures + live sandbox smoke tests | Each marketplace operation against its official sandbox before switching to `implemented` | `apps/api/test/connectors` |
 | Load (Phase 4) | k6 | 20k products / 100k listings / 100k orders per month: list & search p95 < 300 ms, import 5k rows < 2 min | staging |
@@ -49,19 +49,25 @@ CI (`.github/workflows/ci.yml`) runs typecheck, unit, integration, web build and
 | Bulk imports/exports/listing ops with progress & error reports | ✅ | import progress, error downloads, bulk draft/approve/publish results |
 | Credentials securely stored | ✅ by design | AES-256-GCM table, never returned by the API; exercised when connectors land |
 | Automated jobs can be paused safely | ✅ | emergency controls; publish refused and queued jobs wait (tested) |
-| Automated tests for financial, inventory and publishing logic | ✅ | 109 automated tests (58 unit, 45 integration, 6 e2e) |
+| Automated tests for financial, inventory and publishing logic | ✅ | 122 automated tests (65 unit, 51 integration, 6 e2e) |
 | Unit, integration, e2e tests; API docs; migrations; deployment instructions | ✅ | see `docs/openapi.json`, `apps/api/prisma/migrations`, `docs/09-deployment.md` |
 | Demo mode separate from production | ✅ | `DEMO_MODE` refused in production; DEMO accounts/ids labelled |
 
-## 8.4 Open decisions for Fashion Rockstar
+## 8.4 Decisions recorded (October 2026)
 
-1. **VAT treatment of overseas dropship sales** (≤ £135 consignments shipped from outside the UK):
-   confirm with the accountant; the engine supports `marketplace_collected` per line (doc 5).
-2. **Existing eBay listings**: migrate to the Inventory API (`bulkMigrateListing`, one-way) or
-   manage them via the Trading API — decide before Phase 3.
-3. **AliExpress**: is the account approved for the AliExpress dropshipping Open API? If not,
-   AliExpress stays manual (price/stock checks recorded with source and time).
-4. **Amazon PII**: will Fashion Rockstar ship Amazon orders itself (needs the restricted
-   Direct-to-Consumer Shipping role and PII handling) or only use Amazon fulfilment?
-5. **Default thresholds** (minimum profit £3, margin 15%, cost verification 30 days, supplier
-   staleness 48h, dropship buffer 50% / 2 units / max 10): confirm or adjust in Settings.
+| Topic | Decision | Effect |
+|---|---|---|
+| VAT on overseas dropshipping | Apply the UK low-value import rule automatically per supplier | **Built now** (was Phase 5): ships-from country on suppliers and supplier SKUs (and the import file), rule resolved per order line, reason recorded; can be switched off in Settings |
+| Existing eBay listings | Keep managing them the existing way | eBay connector uses the **Trading API** for listing operations; existing Seller Hub listings are adopted, not migrated |
+| AliExpress | Use the official AliExpress dropshipping API | Supplier connector framework and capability table added; implementation in Phase 4 needs the **approved app key and secret** |
+| Amazon orders | Fashion Rockstar ships them itself | Apply for the restricted Direct-to-Consumer Shipping role; customer data encrypted, access audited, deleted ≤ 30 days after delivery (**built now**) |
+
+## 8.5 Still to confirm
+
+1. Is the AliExpress developer app **already approved** for the dropshipping APIs? If not, apply via
+   the AliExpress Open Platform; manual checks continue meanwhile.
+2. For the Amazon restricted-role application: hosting provider and a written security / incident
+   response policy.
+3. Ships-from country for each existing supplier (the dashboard and supplier list flag missing ones).
+4. Default thresholds (minimum profit £3, margin 15%, cost verification 30 days, supplier
+   staleness 48h, dropship buffer 50% / 2 units / max 10, non-Amazon customer data 90 days).

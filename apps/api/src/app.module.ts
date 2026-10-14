@@ -28,6 +28,7 @@ import { ListingsService } from './listings/listings.service';
 import { PublicationService } from './listings/publication.service';
 import { NotificationsController, NotificationsService } from './notifications/notifications.service';
 import { PrismaModule } from './prisma/prisma.module';
+import { CustomerPiiController, CustomerPiiService } from './privacy/customer-pii.service';
 import { ImagesController } from './products/images.controller';
 import { ProductsController } from './products/products.controller';
 import { ProductsService } from './products/products.service';
@@ -50,12 +51,12 @@ import { UsersService } from './users/users.service';
   controllers: [
     HealthController, AuthController, UsersController, AuditController, SettingsController, NotificationsController,
     ProductsController, ImagesController, SuppliersController, CostsController, InventoryController,
-    FinanceController, ListingsController, AccountsController, ImportsController, DashboardController,
+    FinanceController, ListingsController, AccountsController, ImportsController, DashboardController, CustomerPiiController,
   ],
   providers: [
     CryptoService, AuditService, AuthService, SettingsService, NotificationsService, UsersService, StorageService,
     ProductsService, SuppliersService, CostsService, InventoryService, ProfitService,
-    ListingsService, PublicationService, ConnectorRegistry, ImportsService, DashboardService,
+    ListingsService, PublicationService, ConnectorRegistry, ImportsService, DashboardService, CustomerPiiService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_INTERCEPTOR, useClass: SerializeInterceptor },
